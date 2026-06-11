@@ -11,7 +11,9 @@
     <application
         android:name=".BtBalancerApp"
         android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
         android:label="BT Audio Balancer"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.BtAudioBalancer">
 

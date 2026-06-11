@@ -42,6 +42,25 @@ BtAudioBalancer/app/src/main/java/com/example/btaudiobalancer/
 - **Disconnessione**: il service chiama `reset()` (balance=0, LoudnessEnhancer rilasciato) poi si ferma
 - **UI**: lo slider salva+applica in tempo reale tramite `LaunchedEffect(balance, boostMb, enabled)`; switch per disabilitare un profilo senza cancellarlo
 
+## Stato build (aggiornato)
+- `./gradlew assembleDebug` **OK** (build verde)
+- Warning non bloccante: AGP `8.5.2` con `compileSdk 35` (AGP testato fino a 34)
+- Ambiente locale: utile mantenere memoria Gradle piu alta per evitare stop del daemon su macchine con heap default basso
+
+## Modifiche recenti (2026-06-11)
+1. **Risolto fail `checkDebugAarMetadata`**
+    - Aggiunto `android.useAndroidX=true` in `gradle.properties`
+2. **Risolto stop daemon Gradle per GC thrashing**
+    - Aggiunto `org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8` in `gradle.properties`
+3. **Risolto errore Kotlin `Unresolved reference 'serialization'`**
+    - Rimosso import non necessario `kotlinx.serialization.Serializable` da `DeviceAudioSettings.kt`
+4. **Aggiunto `.gitignore` di progetto**
+    - Ignora artefatti build/caches, file locali IDE e `local.properties`
+5. **Aggiunta icona launcher adaptive (Material/Android 13 ready)**
+    - Creati file risorsa: `res/mipmap-anydpi-v26/ic_launcher.xml`, `res/mipmap-anydpi-v26/ic_launcher_round.xml`, `res/drawable/ic_launcher_background.xml`, `res/drawable/ic_launcher_foreground.xml`, `res/drawable/ic_launcher_monochrome.xml`
+    - Aggiornato `AndroidManifest.xml` con `android:icon="@mipmap/ic_launcher"` e `android:roundIcon="@mipmap/ic_launcher_round"`
+    - Verifica risorse completata con `./gradlew :app:processDebugResources` (**OK**)
+
 ## Problemi noti / TODO prioritari
 1. **`LaunchedEffect` salva ad ogni recomposition** — andrebbe sostituito con `snapshotFlow` + `debounce` per evitare scritture eccessive su DataStore
 2. **`refreshConnectedDevices` usa reflection** (`device.isConnected()`) — funziona ma è fragile; valutare `BluetoothProfile.getConnectedDevices()` con `ServiceListener`

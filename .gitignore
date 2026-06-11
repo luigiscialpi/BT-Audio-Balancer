@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+
+# Gradle
+.gradle/
+**/build/
+
+# Android local SDK path
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# Generated native build folders
+.externalNativeBuild/
+.cxx/
+
+# Logs
+*.log
+
+# Keystore and secrets
+*.jks
+*.keystore
+keystore.properties
+
+# Kotlin
+*.kotlin_module
+
+# VS Code local settings (optional)
+.vscode/

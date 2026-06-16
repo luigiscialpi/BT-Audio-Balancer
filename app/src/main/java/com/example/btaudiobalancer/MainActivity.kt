@@ -1,9 +1,12 @@
 package com.example.btaudiobalancer
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,7 +27,9 @@ class MainActivity : ComponentActivity() {
     ) { results ->
         val granted = results.values.all { it }
         viewModel.setPermissionGranted(granted)
-        if (granted) viewModel.refreshConnectedDevices(this)
+        if (granted) {
+            viewModel.refreshConnectedDevices(this)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,6 +79,8 @@ class MainActivity : ComponentActivity() {
             permissionLauncher.launch(missing.toTypedArray())
         }
     }
+
+
 
     private fun requiredPermissions(): List<String> = buildList {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

@@ -11,16 +11,18 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.btaudiobalancer.data.DeviceAudioSettings
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,7 +66,7 @@ fun MainScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
-            // ── Sezione: device connessi ──────────────────────────────────────
+            // -- Sezione: device connessi ------------------------------------------
             item {
                 SectionHeader(
                     icon = Icons.Default.Bluetooth,
@@ -95,7 +97,7 @@ fun MainScreen(
                 }
             }
 
-            // ── Sezione: device salvati non connessi ──────────────────────────
+            // -- Sezione: device salvati non connessi ------------------------------
             val offlineDevices = savedDevices.filter { saved ->
                 uiState.connectedDevices.none { it.deviceAddress == saved.deviceAddress }
             }
@@ -125,7 +127,7 @@ fun MainScreen(
     }
 }
 
-// ── Componenti ────────────────────────────────────────────────────────────────
+// -- Componenti -------------------------------------------------------------------
 
 @Composable
 private fun SectionHeader(
@@ -182,6 +184,14 @@ private fun EmptyCard(
     }
 }
 
+/**
+ * Card per un singolo device Bluetooth con controlli di
+ * bilanciamento L/R e amplificazione.
+ *
+ * Usa snapshotFlow + debounce per evitare scritture eccessive
+ * al DataStore ad ogni micro-spostamento dello slider.
+ */
+@OptIn(FlowPreview::class)
 @Composable
 fun DeviceCard(
     settings: DeviceAudioSettings,
@@ -193,9 +203,18 @@ fun DeviceCard(
     var boostMb by remember(settings.deviceAddress) { mutableIntStateOf(settings.boostMb) }
     var enabled by remember(settings.deviceAddress) { mutableStateOf(settings.enabled) }
 
-    // Salva automaticamente quando l'utente smette di interagire
-    LaunchedEffect(balance, boostMb, enabled) {
-        onSettingsChange(settings.copy(balance = balance, boostMb = boostMb, enabled = enabled))
+    // Debounce: salva solo dopo 300ms di inattivita' dello slider,
+    // evitando centinaia di scritture su DataStore durante il trascinamento
+    LaunchedEffect(settings.deviceAddress) {
+        snapshotFlow { Triple(balance, boostMb, enabled) }
+            .debounce(300L)
+            .collect { (bal, boost, en) ->
+                onSettingsChange(settings.copy(
+                    balance = bal,
+                    boostMb = boost,
+                    enabled = en
+                ))
+            }
     }
 
     Card(
@@ -212,7 +231,7 @@ fun DeviceCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
 
-            // ── Header ────────────────────────────────────────────────────────
+            // -- Header ---------------------------------------------------------------
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -264,7 +283,7 @@ fun DeviceCard(
             if (!enabled) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Profilo disabilitato — non verrà applicato alla connessione",
+                    "Profilo disabilitato -- non verra applicato alla connessione",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
@@ -275,7 +294,7 @@ fun DeviceCard(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.height(16.dp))
 
-            // ── Bilanciamento L/R ─────────────────────────────────────────────
+            // -- Bilanciamento L/R ----------------------------------------------------
             BalanceControl(
                 balance = balance,
                 onBalanceChange = { balance = it }
@@ -283,7 +302,7 @@ fun DeviceCard(
 
             Spacer(Modifier.height(20.dp))
 
-            // ── Amplificazione ────────────────────────────────────────────────
+            // -- Amplificazione -------------------------------------------------------
             BoostControl(
                 boostMb = boostMb,
                 onBoostChange = { boostMb = it }
@@ -341,6 +360,26 @@ private fun BalanceControl(
             ) {
                 Text("Centra", style = MaterialTheme.typography.labelSmall)
             }
+        }
+
+        // Nota informativa sul supporto del bilanciamento
+        Spacer(Modifier.height(4.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                Icons.Default.Info,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                "Usa DynamicsProcessing (sessione globale) -- applicato via hardware. Lo slider di accessibilità di Android rimarrà al centro.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
         }
     }
 }
@@ -401,7 +440,7 @@ private fun BoostControl(
         if (boostMb > 900) {
             Spacer(Modifier.height(4.dp))
             Text(
-                "⚠ Livelli alti possono distorcere l'audio",
+                "Attenzione: livelli alti possono distorcere l'audio",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
             )
@@ -431,14 +470,14 @@ private fun BoostControl(
 
         // LoudnessEnhancer note
         Text(
-            "Usa LoudnessEnhancer (sessione globale) — funziona su tutti i device",
+            "Usa LoudnessEnhancer (sessione globale) -- funziona su tutti i device",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
         )
     }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// -- Helpers ----------------------------------------------------------------------
 
 private fun balanceLabel(balance: Float): String = when {
     balance < -0.05f -> "L ${((-balance) * 100).roundToInt()}%"

@@ -4,12 +4,12 @@ import android.app.Application
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
-import android.os.Build
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.btaudiobalancer.audio.AudioEffectApplier
 import com.example.btaudiobalancer.data.DeviceAudioSettings
 import com.example.btaudiobalancer.data.DeviceSettingsRepository
+import com.example.btaudiobalancer.service.AudioEffectService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,10 +23,16 @@ data class UiState(
     val hasBluetoothPermission: Boolean = false
 )
 
+/**
+ * ViewModel principale dell'app.
+ *
+ * Non possiede piu' un AudioEffectApplier proprio: delega l'applicazione
+ * degli effetti al AudioEffectService tramite Intent (ACTION_UPDATE).
+ * Questo evita la duplicazione di istanze che si sovrascrivono a vicenda.
+ */
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = DeviceSettingsRepository(app)
-    private val applier    = AudioEffectApplier(app)
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState
@@ -77,10 +83,36 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Salva le impostazioni nel repository e delega l'applicazione
+     * degli effetti audio al AudioEffectService tramite ACTION_UPDATE.
+     *
+     * Il Service applica gli effetti solo se il device corrisponde
+     * a quello attualmente attivo (ultimo connesso), evitando
+     * il cross-device leak.
+     */
     fun updateAndApply(settings: DeviceAudioSettings) {
         viewModelScope.launch {
             repository.save(settings)
-            applier.apply(settings)
+        }
+        // Delega l'applicazione al Service (che ha l'unica istanza di AudioEffectApplier)
+        val context = getApplication<Application>()
+        val intent = AudioEffectService.intentUpdate(
+            context = context,
+            mac = settings.deviceAddress,
+            name = settings.deviceName,
+            balance = settings.balance,
+            boostMb = settings.boostMb,
+            enabled = settings.enabled
+        )
+        try {
+            // Poiché l'utente sta interagendo con l'interfaccia (UI attiva), possiamo usare startService.
+            // Se il Service è già attivo in Foreground (perché le cuffie sono connesse), l'intent
+            // viene consegnato normalmente a onStartCommand.
+            context.startService(intent)
+        } catch (e: Exception) {
+            android.util.Log.w("MainViewModel",
+                "startService failed, settings saved: ${e.message}")
         }
     }
 
@@ -92,10 +124,5 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setPermissionGranted(granted: Boolean) {
         _uiState.update { it.copy(hasBluetoothPermission = granted) }
-    }
-
-    override fun onCleared() {
-        applier.release()
-        super.onCleared()
     }
 }

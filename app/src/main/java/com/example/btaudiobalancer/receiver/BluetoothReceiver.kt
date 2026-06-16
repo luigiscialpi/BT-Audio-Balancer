@@ -29,7 +29,9 @@ class BluetoothReceiver : BroadcastReceiver() {
                 ContextCompat.startForegroundService(context, serviceIntent)
             }
             BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                val serviceIntent = AudioEffectService.intentReset(context)
+                // Passa il MAC del device disconnesso al Service cosi'
+                // puo' resettare solo se corrisponde al device attivo
+                val serviceIntent = AudioEffectService.intentReset(context, mac, name)
                 ContextCompat.startForegroundService(context, serviceIntent)
             }
         }

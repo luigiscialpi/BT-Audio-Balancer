@@ -64,6 +64,8 @@ class AudioEffectApplier(private val context: Context) {
     fun apply(settings: DeviceAudioSettings, force: Boolean = false): BalanceResult {
         if (!settings.enabled) {
             Log.d(TAG, "Device ${settings.deviceName} disabled, skipping")
+            // Gli effetti gia' attivi vanno spenti: erano di questo device, o (force) questo prende il posto di un altro.
+            if (activeDeviceMac != null && (force || activeDeviceMac == settings.deviceAddress)) reset()
             return BalanceResult.NEUTRAL
         }
 

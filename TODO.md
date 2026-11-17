@@ -4,7 +4,7 @@ Si spunta `[x]` nella stessa patch che chiude l'attività. Ogni voce ha un ID da
 
 ## Bug
 
-- [ ] **B1** Salvataggio e applicazione automatici all'apertura dell'app (`DeviceCard`, `MainViewModel.updateAndApply`): può sovrascrivere il profilo con i valori di default, applica il profilo di un device non connesso, crea profili per device non audio.
+- [x] **B1** Salvataggio e applicazione automatici all'apertura dell'app (`DeviceCard`, `MainViewModel.updateAndApply`): può sovrascrivere il profilo con i valori di default, applica il profilo di un device non connesso, crea profili per device non audio.
 - [ ] **B2** Più device Bluetooth: effetti persi o sostituiti. Un device senza profilo diventa "attivo" senza toccare gli effetti; alla disconnessione dell'attivo non si riapplica il profilo del device rimasto; il reset scrive `master_balance=0` anche se il device non era attivo; `BluetoothReceiver` reagisce anche ai device non audio.
 - [ ] **B3** Effetti persi dopo l'uccisione del processo (intent nullo con `START_STICKY`, `BootReceiver` vuoto) e race tra `ACTION_APPLY` (IO) e reset/update (main) su `AudioEffectApplier`, che non è thread-safe.
 - [ ] **B4** L'interruttore "abilitato" non azzera gli effetti già applicati (`AudioEffectApplier.apply`, uscita anticipata).
@@ -23,6 +23,7 @@ Si spunta `[x]` nella stessa patch che chiude l'attività. Ogni voce ha un ID da
 - [ ] **U1** Target di tocco sotto i 48 dp (switch forzato a 40×24 dp, cestino a 36 dp) ed eliminazione del profilo senza conferma né annulla.
 - [ ] **U2** Il pulsante "Aggiorna" usa l'icona Bluetooth invece di una di aggiornamento. Meglio aggiornare la lista in automatico agli eventi di connessione (vedi M5).
 - [ ] **U3** Sotto gli slider compaiono testi tecnici ("DynamicsProcessing, sessione globale...") che dipendono dalla strategia realmente usata; `BalanceResult.NOT_SUPPORTED` viene calcolato ma non arriva mai alla UI.
+- [ ] **U4** Dopo B1 l'effetto del balance si sente solo al rilascio dello slider (prima, dopo 300 ms di pausa durante il trascinamento). Valutare un'anteprima dal vivo che applichi senza salvare.
 
 ## Documentazione
 

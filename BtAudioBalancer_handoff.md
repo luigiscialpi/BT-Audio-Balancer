@@ -40,7 +40,7 @@ BtAudioBalancer/app/src/main/java/com/example/btaudiobalancer/
 ## Comportamento chiave
 - **Isolamento dei profili (Anti Cross-Device Leak)**: Il `AudioEffectService` traccia l'indirizzo MAC del dispositivo attivo (`activeDeviceMac`). Qualsiasi update o reset (su disconnessione) viene applicato all'applier solo se l'indirizzo del dispositivo corrisponde a quello attivo.
 - **Service Unico**: Il `MainViewModel` non istanzia un proprio `AudioEffectApplier` per evitare sovrascritture concorrenti; delega tutte le modifiche in tempo reale al `AudioEffectService` via `ACTION_UPDATE` Intent.
-- **UI & Performance**: Lo slider del bilanciamento e del boost salva ed applica le modifiche in Compose utilizzando `snapshotFlow` + `debounce(300ms)` per evitare rallentamenti dovuti a troppe scritture DataStore consecutive.
+- **UI & Performance**: Gli slider salvano e applicano solo al rilascio (`onValueChangeFinished`), mai alla comparsa della card, quindi una scrittura DataStore per gesto e nessun salvataggio spontaneo all'apertura dell'app. Un profilo di un device non connesso viene salvato ma non applicato.
 
 ## Stato build
 - `./gradlew assembleDebug` **OK** (build verde, pronto per installazione locale)

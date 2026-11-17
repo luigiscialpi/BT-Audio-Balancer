@@ -95,6 +95,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             repository.save(settings)
         }
+        // Un profilo di un device non connesso si salva e basta: applicarlo muoverebbe
+        // gli effetti di sistema per un device che non sta riproducendo nulla.
+        if (_uiState.value.connectedDevices.none { it.deviceAddress == settings.deviceAddress }) return
+
         // Delega l'applicazione al Service (che ha l'unica istanza di AudioEffectApplier)
         val context = getApplication<Application>()
         val intent = AudioEffectService.intentUpdate(

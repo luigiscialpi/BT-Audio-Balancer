@@ -21,8 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.btaudiobalancer.data.DeviceAudioSettings
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.debounce
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -188,10 +186,9 @@ private fun EmptyCard(
  * Card per un singolo device Bluetooth con controlli di
  * bilanciamento L/R e amplificazione.
  *
- * Usa snapshotFlow + debounce per evitare scritture eccessive
- * al DataStore ad ogni micro-spostamento dello slider.
+ * Salva solo su azione dell'utente: al rilascio dello slider, al cambio dello
+ * switch o al tocco su "Centra". Mai alla semplice comparsa della card.
  */
-@OptIn(FlowPreview::class)
 @Composable
 fun DeviceCard(
     settings: DeviceAudioSettings,
@@ -199,23 +196,10 @@ fun DeviceCard(
     onSettingsChange: (DeviceAudioSettings) -> Unit,
     onDelete: () -> Unit
 ) {
-    var balance by remember(settings.deviceAddress) { mutableFloatStateOf(settings.balance) }
-    var boostMb by remember(settings.deviceAddress) { mutableIntStateOf(settings.boostMb) }
-    var enabled by remember(settings.deviceAddress) { mutableStateOf(settings.enabled) }
-
-    // Debounce: salva solo dopo 300ms di inattivita' dello slider,
-    // evitando centinaia di scritture su DataStore durante il trascinamento
-    LaunchedEffect(settings.deviceAddress) {
-        snapshotFlow { Triple(balance, boostMb, enabled) }
-            .debounce(300L)
-            .collect { (bal, boost, en) ->
-                onSettingsChange(settings.copy(
-                    balance = bal,
-                    boostMb = boost,
-                    enabled = en
-                ))
-            }
-    }
+    // Valori mostrati durante il trascinamento. Si riallineano a quelli salvati quando
+    // cambiano (es. DataStore caricato dopo il primo disegno della card).
+    var balance by remember(settings.balance) { mutableFloatStateOf(settings.balance) }
+    var boostMb by remember(settings.boostMb) { mutableIntStateOf(settings.boostMb) }
 
     Card(
         modifier = Modifier
@@ -269,8 +253,8 @@ fun DeviceCard(
                 Spacer(Modifier.width(4.dp))
                 // Switch abilitazione
                 Switch(
-                    checked = enabled,
-                    onCheckedChange = { enabled = it },
+                    checked = settings.enabled,
+                    onCheckedChange = { onSettingsChange(settings.copy(enabled = it)) },
                     modifier = Modifier.size(40.dp, 24.dp)
                 )
                 IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
@@ -280,7 +264,7 @@ fun DeviceCard(
                 }
             }
 
-            if (!enabled) {
+            if (!settings.enabled) {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "Profilo disabilitato -- non verra applicato alla connessione",
@@ -295,9 +279,11 @@ fun DeviceCard(
             Spacer(Modifier.height(16.dp))
 
             // -- Bilanciamento L/R ----------------------------------------------------
+            // Il salvataggio legge lo stato al momento del rilascio, non un valore catturato prima.
             BalanceControl(
                 balance = balance,
-                onBalanceChange = { balance = it }
+                onBalanceChange = { balance = it },
+                onBalanceChangeFinished = { onSettingsChange(settings.copy(balance = balance)) }
             )
 
             Spacer(Modifier.height(20.dp))
@@ -305,7 +291,8 @@ fun DeviceCard(
             // -- Amplificazione -------------------------------------------------------
             BoostControl(
                 boostMb = boostMb,
-                onBoostChange = { boostMb = it }
+                onBoostChange = { boostMb = it },
+                onBoostChangeFinished = { onSettingsChange(settings.copy(boostMb = boostMb)) }
             )
         }
     }
@@ -314,7 +301,8 @@ fun DeviceCard(
 @Composable
 private fun BalanceControl(
     balance: Float,
-    onBalanceChange: (Float) -> Unit
+    onBalanceChange: (Float) -> Unit,
+    onBalanceChangeFinished: () -> Unit
 ) {
     Column {
         Row(
@@ -345,6 +333,7 @@ private fun BalanceControl(
             Slider(
                 value = balance,
                 onValueChange = onBalanceChange,
+                onValueChangeFinished = onBalanceChangeFinished,
                 valueRange = -1f..1f,
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
             )
@@ -355,7 +344,10 @@ private fun BalanceControl(
         // Bottone reset al centro
         if (balance != 0f) {
             TextButton(
-                onClick = { onBalanceChange(0f) },
+                onClick = {
+                    onBalanceChange(0f)
+                    onBalanceChangeFinished()
+                },
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             ) {
                 Text("Centra", style = MaterialTheme.typography.labelSmall)
@@ -419,7 +411,8 @@ private fun BalanceVisualizer(balance: Float) {
 @Composable
 private fun BoostControl(
     boostMb: Int,
-    onBoostChange: (Int) -> Unit
+    onBoostChange: (Int) -> Unit,
+    onBoostChangeFinished: () -> Unit
 ) {
     Column {
         Row(
@@ -456,6 +449,7 @@ private fun BoostControl(
             Slider(
                 value = boostMb.toFloat(),
                 onValueChange = { onBoostChange(it.roundToInt()) },
+                onValueChangeFinished = onBoostChangeFinished,
                 valueRange = 0f..1500f,
                 steps = 14, // step da 100 mB = 1 dB
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp),

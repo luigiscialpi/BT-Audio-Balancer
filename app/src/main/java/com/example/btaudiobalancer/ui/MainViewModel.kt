@@ -7,6 +7,7 @@ import android.content.Context
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.btaudiobalancer.bluetooth.isAudio
 import com.example.btaudiobalancer.data.DeviceAudioSettings
 import com.example.btaudiobalancer.data.DeviceSettingsRepository
 import com.example.btaudiobalancer.service.AudioEffectService
@@ -57,6 +58,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         try {
             val connected = adapter.bondedDevices
+                ?.filter { it.isAudio() }
                 ?.filter { dev ->
                     // Filtra solo quelli effettivamente connessi (API 14+)
                     try {

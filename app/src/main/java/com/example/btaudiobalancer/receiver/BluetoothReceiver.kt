@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.content.ContextCompat
+import com.example.btaudiobalancer.bluetooth.isAudio
 import com.example.btaudiobalancer.service.AudioEffectService
 
 class BluetoothReceiver : BroadcastReceiver() {
@@ -19,6 +20,8 @@ class BluetoothReceiver : BroadcastReceiver() {
         }
 
         device ?: return
+        // Orologi, mouse ecc. non devono toccare gli effetti
+        if (!device.isAudio()) return
 
         val mac  = device.address ?: return
         val name = try { device.name ?: mac } catch (_: SecurityException) { mac }

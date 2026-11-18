@@ -37,8 +37,7 @@ enum class BalanceResult {
  * Boost: LoudnessEnhancer su audioSessionId=0 (sessione globale) --
  *   funziona su tutti i device Android 9+ senza root.
  *
- * Traccia il MAC del device attualmente attivo per evitare che
- * le modifiche su un profilo impattino un altro device connesso.
+ * Non sa nulla dei device: e' il service a decidere quale profilo applicare.
  */
 class AudioEffectApplier(private val context: Context) {
 
@@ -47,36 +46,26 @@ class AudioEffectApplier(private val context: Context) {
     private var dynamicsProcessing: android.media.audiofx.DynamicsProcessing? = null
 
     /**
-     * MAC del device per cui gli effetti sono attualmente attivi.
-     * Null se nessun device e' attivo (stato "resettato").
+     * True se abbiamo applicato qualcosa che reset() deve annullare.
+     * shortcut: vive solo in memoria, quindi dopo la morte del processo un master_balance
+     * scritto in Settings resta finche' un nuovo apply non lo sovrascrive (vedi B3).
      */
-    var activeDeviceMac: String? = null
-        internal set
+    private var applied = false
 
     /**
      * Applica le impostazioni di un device.
      *
      * @param settings le impostazioni da applicare
-     * @param force se true, applica anche se il MAC non corrisponde a quello attivo
-     *              (usato dal Service al momento della connessione)
      * @return risultato dell'applicazione del balance
      */
-    fun apply(settings: DeviceAudioSettings, force: Boolean = false): BalanceResult {
+    fun apply(settings: DeviceAudioSettings): BalanceResult {
         if (!settings.enabled) {
-            Log.d(TAG, "Device ${settings.deviceName} disabled, skipping")
-            // Gli effetti gia' attivi vanno spenti: erano di questo device, o (force) questo prende il posto di un altro.
-            if (activeDeviceMac != null && (force || activeDeviceMac == settings.deviceAddress)) reset()
+            Log.d(TAG, "Device ${settings.deviceName} disabled, resetting")
+            reset()
             return BalanceResult.NEUTRAL
         }
 
-        // Se non forzato, applica solo se il device e' quello attivo
-        if (!force && activeDeviceMac != null && activeDeviceMac != settings.deviceAddress) {
-            Log.d(TAG, "Skipping apply for ${settings.deviceName}: " +
-                    "active device is $activeDeviceMac, not ${settings.deviceAddress}")
-            return BalanceResult.NEUTRAL
-        }
-
-        activeDeviceMac = settings.deviceAddress
+        applied = true
 
         val balanceResult = applyBalance(settings.balance)
         applyBoost(settings.boostMb)
@@ -88,24 +77,17 @@ class AudioEffectApplier(private val context: Context) {
 
     /**
      * Ripristina i valori neutri (centro, nessun boost).
-     * Chiamare quando il device si disconnette.
-     *
-     * @param mac MAC del device che si e' disconnesso;
-     *            resetta solo se corrisponde al device attivo
+     * Chiamare quando il device attivo si disconnette o viene disabilitato.
+     * Se non c'e' nulla di applicato non fa niente, per non sovrascrivere il
+     * master_balance che l'utente ha impostato dall'Accessibilita'.
      */
-    fun reset(mac: String? = null) {
-        // Se viene specificato un MAC diverso da quello attivo, non resettare:
-        // significa che si e' disconnesso un device secondario, non quello attivo
-        if (mac != null && activeDeviceMac != null && mac != activeDeviceMac) {
-            Log.d(TAG, "Skipping reset: disconnected device $mac " +
-                    "is not the active device $activeDeviceMac")
-            return
-        }
+    fun reset() {
+        if (!applied) return
 
         applyBalance(0f)
         releaseBoost()
         releaseDynamicsProcessing()
-        activeDeviceMac = null
+        applied = false
         Log.i(TAG, "Reset to neutral")
     }
 

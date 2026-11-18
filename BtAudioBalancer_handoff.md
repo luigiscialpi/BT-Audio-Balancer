@@ -38,7 +38,7 @@ BtAudioBalancer/app/src/main/java/com/example/btaudiobalancer/
 | Amplificazione | `LoudnessEnhancer(audioSessionId = 0)` + `setTargetGain(boostMb)` | Sessione globale → tutto l'audio di sistema. Range 0..1500 mB (0..+15 dB). Funziona su tutti i device senza root. |
 
 ## Comportamento chiave
-- **Isolamento dei profili (Anti Cross-Device Leak)**: Il `AudioEffectService` traccia l'indirizzo MAC del dispositivo attivo (`activeDeviceMac`). Qualsiasi update o reset (su disconnessione) viene applicato all'applier solo se l'indirizzo del dispositivo corrisponde a quello attivo.
+- **Isolamento dei profili (Anti Cross-Device Leak)**: Il `AudioEffectService` tiene l'elenco (`connected`) dei device audio connessi che hanno un profilo salvato; gli effetti sono globali, quindi vale quello dell'ultimo connesso. Update dalla UI per un altro device vengono solo salvati. Alla disconnessione dell'attivo si riapplica il profilo del precedente; se non ne resta nessuno si azzera e il service si ferma. Un device senza profilo viene ignorato. I comandi (APPLY/RESET/UPDATE) passano da una coda e girano uno alla volta. `BluetoothReceiver` e la lista "connessi" della UI escludono i device non audio (`isAudio()`).
 - **Service Unico**: Il `MainViewModel` non istanzia un proprio `AudioEffectApplier` per evitare sovrascritture concorrenti; delega tutte le modifiche in tempo reale al `AudioEffectService` via `ACTION_UPDATE` Intent.
 - **UI & Performance**: Gli slider salvano e applicano solo al rilascio (`onValueChangeFinished`), mai alla comparsa della card, quindi una scrittura DataStore per gesto e nessun salvataggio spontaneo all'apertura dell'app. Un profilo di un device non connesso viene salvato ma non applicato.
 
@@ -49,14 +49,14 @@ BtAudioBalancer/app/src/main/java/com/example/btaudiobalancer/
 ## Modifiche recenti (Giugno 2026)
 1. **Risolto leak cross-device**: Il ViewModel delega al service tramite `ACTION_UPDATE` per usare un'unica istanza di applier.
 2. **Risolto reset prematuro**: Il `BluetoothReceiver` passa l'indirizzo MAC a `ACTION_RESET`. Il Service spegne gli effetti solo se il device che si disconnette è quello attualmente attivo.
-3. **Ottimizzazione scritture DataStore**: Sostituito il `LaunchedEffect` con `snapshotFlow` + `debounce(300ms)` in `MainScreen.kt` per fluidificare lo slider.
+3. **Ottimizzazione scritture DataStore**: gli slider in `MainScreen.kt` salvano solo al rilascio (`onValueChangeFinished`).
 4. **Implementato bilanciamento multilivello**: Creato l'applier a tripla strategia in `AudioEffectApplier.kt` che tenta per primo `Settings.System` (sbloccato da `WRITE_SECURE_SETTINGS` concesso via ADB) e in alternativa `DynamicsProcessing` a livello DSP o `setParameters` legacy.
 5. **Rimozione della frizione permessi all'avvio**: Eliminata la chiamata invasiva a `ensureWriteSettingsPermission` in `MainActivity.kt` per far avviare l'app in modo pulito e immediato.
 6. **Aggiunta del tag `maxSdkVersion="30"`** sul permesso legacy `BLUETOOTH` in `AndroidManifest.xml` (Risolto TODO n.3).
 
 ## Problemi noti / TODO prioritari
 1. **`refreshConnectedDevices` usa reflection** (`device.isConnected()`) — funziona ma è fragile; valutare `BluetoothProfile.getConnectedDevices()` con `ServiceListener`.
-2. **`BootReceiver` vuoto** — se si vuole riapplicare i settings dopo un reboot con device già connesso, serve logica aggiuntiva qui.
+2. **`BootReceiver` vuoto** — non serve: dopo un reboot nessun device è connesso e `ACL_CONNECTED` copre la riconnessione (vedi M6 in `TODO.md`).
 
 ## Come buildare e testare
 ```bash

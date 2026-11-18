@@ -5,18 +5,19 @@ Si spunta `[x]` nella stessa patch che chiude l'attività. Ogni voce ha un ID da
 ## Bug
 
 - [x] **B1** Salvataggio e applicazione automatici all'apertura dell'app (`DeviceCard`, `MainViewModel.updateAndApply`): può sovrascrivere il profilo con i valori di default, applica il profilo di un device non connesso, crea profili per device non audio.
-- [ ] **B2** Più device Bluetooth: effetti persi o sostituiti. Un device senza profilo diventa "attivo" senza toccare gli effetti; alla disconnessione dell'attivo non si riapplica il profilo del device rimasto; il reset scrive `master_balance=0` anche se il device non era attivo; `BluetoothReceiver` reagisce anche ai device non audio.
-- [ ] **B3** Effetti persi dopo l'uccisione del processo (intent nullo con `START_STICKY`, `BootReceiver` vuoto) e race tra `ACTION_APPLY` (IO) e reset/update (main) su `AudioEffectApplier`, che non è thread-safe.
+- [x] **B2** Più device Bluetooth: effetti persi o sostituiti. Un device senza profilo diventa "attivo" senza toccare gli effetti; alla disconnessione dell'attivo non si riapplica il profilo del device rimasto; il reset scrive `master_balance=0` anche se il device non era attivo; `BluetoothReceiver` reagisce anche ai device non audio.
+- [ ] **B3** Effetti persi dopo l'uccisione del processo: il restart `START_STICKY` arriva con intent nullo e il service non fa nulla, quindi gli effetti restano spenti fino alla riconnessione. Da rileggere dal sistema i device A2DP già connessi (`getProfileProxy`). La race tra i comandi è chiusa con B2 (coda in `AudioEffectService`).
 - [x] **B4** L'interruttore "abilitato" non azzera gli effetti già applicati (`AudioEffectApplier.apply`, uscita anticipata).
 - [ ] **B5** Balance, da verificare su device: ordine delle strategie diverso dall'handoff (DynamicsProcessing prima di Settings), `Settings.System.canWrite` non copre `WRITE_SECURE_SETTINGS`, effetti sulla sessione 0 deprecati dalla documentazione Android.
 
 ## Minori
 
 - [ ] **M1** `LoudnessEnhancer` rilasciato e ricreato a ogni modifica: aggiornare `setTargetGain` sull'istanza esistente.
-- [ ] **M2** `ACTION_RESET` non chiama `startForeground` ma il receiver usa `startForegroundService`: rischio `ForegroundServiceDidNotStartInTimeException`.
+- [x] **M2** `ACTION_RESET` non chiama `startForeground` ma il receiver usa `startForegroundService`: rischio `ForegroundServiceDidNotStartInTimeException`.
 - [ ] **M3** Senza `BLUETOOTH_CONNECT` (Android 14+) `startForeground` può lanciare `SecurityException` dal percorso UI.
 - [ ] **M4** Eliminare il profilo del device attivo non azzera gli effetti.
-- [ ] **M5** Lista "connessi": `isConnected` via reflection su API nascosta (se fallisce risultano connessi tutti i device accoppiati) e aggiornamento solo in `onResume` o a mano.
+- [ ] **M5** Lista "connessi": `isConnected` via reflection su API nascosta (se fallisce risultano connessi tutti i device accoppiati) e aggiornamento solo in `onResume` o a mano. (I device non audio sono già esclusi.)
+- [ ] **M6** `BootReceiver` non fa nulla e non serve: dopo un riavvio nessun device è connesso e `ACL_CONNECTED` copre la riconnessione. Eliminarlo insieme a `RECEIVE_BOOT_COMPLETED`.
 
 ## UX/UI
 
@@ -31,4 +32,4 @@ Si spunta `[x]` nella stessa patch che chiude l'attività. Ogni voce ha un ID da
 
 ## Test
 
-- [ ] **T1** Il repo non ha test. Aggiungere JUnit e coprire la logica del device attivo quando viene estratta in una classe senza dipendenze Android (insieme a B2/B3).
+- [ ] **T1** Il repo non ha test. Aggiungere JUnit e coprire la regola "vince l'ultimo connesso, alla disconnessione torna il precedente" (oggi in `AudioEffectService.handle`, da estrarre solo quando c'è il test).

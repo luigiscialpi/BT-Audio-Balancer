@@ -12,25 +12,34 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.btaudiobalancer.MainActivity
 import com.example.btaudiobalancer.audio.AudioEffectApplier
+import com.example.btaudiobalancer.data.DeviceAudioSettings
 import com.example.btaudiobalancer.data.DeviceSettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
 /**
  * Foreground service che applica gli effetti audio al device Bluetooth connesso.
  *
- * Traccia il MAC del device attivo e resetta solo quando quel device
- * si disconnette (non quando si disconnette un device secondario).
+ * Tiene l'elenco dei device connessi che hanno un profilo salvato. Gli effetti sono
+ * globali, quindi vale il profilo dell'ultimo connesso; quando si disconnette torna
+ * quello del device precedente, e se non ne resta nessuno azzera e si ferma.
+ * I comandi passano da una coda e vengono eseguiti uno alla volta.
  */
 class AudioEffectService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var applier: AudioEffectApplier
     private lateinit var repository: DeviceSettingsRepository
+
+    /** Comandi (intent e startId) in ordine di arrivo: l'applier non e' thread-safe. */
+    private val commands = Channel<Pair<Intent, Int>>(Channel.UNLIMITED)
+
+    /** MAC -> nome dei device connessi, in ordine di connessione: l'ultimo e' l'attivo. */
+    private val connected = LinkedHashMap<String, String>()
 
     companion object {
         const val ACTION_APPLY  = "com.example.btaudiobalancer.APPLY"
@@ -44,6 +53,7 @@ class AudioEffectService : Service() {
         const val EXTRA_ENABLED = "device_enabled"
         const val CHANNEL_ID    = "bt_audio_balancer"
         private const val NOTIF_ID = 1
+        private const val TAG = "AudioEffectService"
 
         /**
          * Crea un Intent per applicare le impostazioni di un device appena connesso.
@@ -93,71 +103,75 @@ class AudioEffectService : Service() {
         applier    = AudioEffectApplier(this)
         repository = DeviceSettingsRepository(this)
         createNotificationChannel()
+        scope.launch {
+            for ((intent, startId) in commands) {
+                try {
+                    handle(intent, startId)
+                } catch (e: Exception) {
+                    // Un comando fallito non deve bloccare quelli che seguono
+                    Log.e(TAG, "Command ${intent.action} failed", e)
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        // Restart del sistema senza intent: non c'e' nulla da eseguire (vedi B3 nel TODO)
+        intent ?: return START_STICKY
+        // Il sistema vuole startForeground subito dopo startForegroundService, qualunque sia
+        // l'azione; il testo con il nome del device lo mette handle().
+        startForeground(NOTIF_ID, buildNotification("Effetti audio attivi"))
+        commands.trySend(intent to startId)
+        return START_STICKY
+    }
+
+    private suspend fun handle(intent: Intent, startId: Int) {
+        val mac  = intent.getStringExtra(EXTRA_MAC) ?: return
+        val name = intent.getStringExtra(EXTRA_NAME) ?: mac
+        when (intent.action) {
             ACTION_APPLY -> {
-                val mac  = intent.getStringExtra(EXTRA_MAC)  ?: return START_NOT_STICKY
-                val name = intent.getStringExtra(EXTRA_NAME) ?: mac
-                startForeground(NOTIF_ID, buildNotification("Connesso: $name"))
-                scope.launch {
-                    val settings = repository.deviceFlow(mac).firstOrNull()
-                    if (settings != null) {
-                        // force=true: alla connessione, questo device diventa attivo
-                        applier.apply(settings, force = true)
-                        Log.i("AudioEffectService", "Applied settings for $name")
-                    } else {
-                        // Device nuovo -- nessun profilo salvato, non fare nulla
-                        // ma segna comunque come device attivo
-                        applier.activeDeviceMac = mac
-                        Log.i("AudioEffectService", "New device $name -- no saved profile, skipping")
-                    }
+                val settings = repository.getOnce(mac)
+                if (settings == null) {
+                    // Senza profilo non si toccano gli effetti: potrebbero essere di un altro device
+                    Log.i(TAG, "$name: no saved profile, ignoring")
+                } else {
+                    connected.remove(mac) // se c'era gia' torna in fondo, cioe' diventa l'attivo
+                    connected[mac] = name
+                    applier.apply(settings)
                 }
             }
             ACTION_RESET -> {
-                val mac = intent.getStringExtra(EXTRA_MAC)
-                val name = intent.getStringExtra(EXTRA_NAME) ?: mac ?: "unknown"
-                // Resetta solo se il device disconnesso e' quello attivo
-                applier.reset(mac)
-
-                // Se il device attivo e' stato resettato (activeDeviceMac e' null ora),
-                // ferma il service. Altrimenti mantieni il service attivo
-                // per il device ancora connesso
-                if (applier.activeDeviceMac == null) {
-                    Log.i("AudioEffectService", "Active device $name disconnected, stopping service")
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
-                } else {
-                    Log.i("AudioEffectService",
-                        "Secondary device $name disconnected, keeping service for ${applier.activeDeviceMac}")
-                }
+                val wasActive = connected.keys.lastOrNull() == mac
+                connected.remove(mac)
+                if (wasActive) applyActive()
             }
             ACTION_UPDATE -> {
-                // Aggiornamento in tempo reale dalla UI
-                val mac     = intent.getStringExtra(EXTRA_MAC)  ?: return START_NOT_STICKY
-                val name    = intent.getStringExtra(EXTRA_NAME) ?: mac
-                val balance = intent.getFloatExtra(EXTRA_BALANCE, 0f)
-                val boostMb = intent.getIntExtra(EXTRA_BOOST, 0)
-                val enabled = intent.getBooleanExtra(EXTRA_ENABLED, true)
-
-                val settings = com.example.btaudiobalancer.data.DeviceAudioSettings(
-                    deviceAddress = mac,
-                    deviceName = name,
-                    balance = balance,
-                    boostMb = boostMb,
-                    enabled = enabled
-                )
-                // Se per qualche motivo il Service viene avviato da zero con UPDATE,
-                // dobbiamo chiamare startForeground per evitare ForegroundServiceDidNotStartInTimeException
-                startForeground(NOTIF_ID, buildNotification("Connesso: $name"))
-                
-                // Applica solo se e' il device attivo
-                applier.apply(settings)
-                Log.d("AudioEffectService", "UI update for $name: balance=$balance boost=$boostMb")
+                // Service appena avviato dalla UI, che considera connesso questo device: ci si fida
+                if (connected.isEmpty()) connected[mac] = name
+                // Un device secondario si salva (lo fa il ViewModel) ma non si applica
+                if (connected.keys.last() == mac) {
+                    applier.apply(DeviceAudioSettings(
+                        deviceAddress = mac,
+                        deviceName    = name,
+                        balance       = intent.getFloatExtra(EXTRA_BALANCE, 0f),
+                        boostMb       = intent.getIntExtra(EXTRA_BOOST, 0),
+                        enabled       = intent.getBooleanExtra(EXTRA_ENABLED, true)
+                    ))
+                }
             }
         }
-        return START_STICKY
+        if (connected.isEmpty()) {
+            applier.reset()
+            stopSelf(startId) // ignorato se nel frattempo e' arrivato un comando piu' recente
+        } else {
+            startForeground(NOTIF_ID, buildNotification("Connesso: ${connected.values.last()}"))
+        }
+    }
+
+    /** Applica il profilo dell'ultimo device connesso; azzera se non ce n'e' o non ha piu' un profilo. */
+    private suspend fun applyActive() {
+        val settings = connected.keys.lastOrNull()?.let { repository.getOnce(it) }
+        if (settings == null) applier.reset() else applier.apply(settings)
     }
 
     override fun onDestroy() {

@@ -23,7 +23,7 @@ Si spunta `[x]` nella stessa patch che chiude l'attività. Ogni voce ha un ID da
 
 - [ ] **U1** Target di tocco sotto i 48 dp (switch forzato a 40×24 dp, cestino a 36 dp) ed eliminazione del profilo senza conferma né annulla.
 - [ ] **U2** Il pulsante "Aggiorna" usa l'icona Bluetooth invece di una di aggiornamento. Meglio aggiornare la lista in automatico agli eventi di connessione (vedi M5).
-- [ ] **U3** Sotto gli slider compaiono testi tecnici ("DynamicsProcessing, sessione globale...") che dipendono dalla strategia realmente usata; `BalanceResult.NOT_SUPPORTED` viene calcolato ma non arriva mai alla UI. Dopo B5 il testo del balance è falso quando vince Settings (lo slider di accessibilità di Android si muove) e quello del boost ("funziona su tutti i device") promette troppo.
+- [x] **U3** Tolti i testi tecnici sotto gli slider ("DynamicsProcessing, sessione globale...", "LoudnessEnhancer... funziona su tutti i device"): dipendevano dalla strategia usata e dopo B5 erano falsi o promettevano troppo. Al loro posto un solo avviso in cima alla lista finché manca `WRITE_SECURE_SETTINGS`. `BalanceResult.NOT_SUPPORTED` non arriva alla UI per scelta: `setParameters` risulta sempre riuscito, quindi quasi non scatta, e l'avviso sul permesso copre il caso reale.
 - [ ] **U4** Dopo B1 l'effetto del balance si sente solo al rilascio dello slider (prima, dopo 300 ms di pausa durante il trascinamento). Valutare un'anteprima dal vivo che applichi senza salvare.
 
 ## Documentazione

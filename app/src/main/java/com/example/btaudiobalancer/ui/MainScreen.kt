@@ -1,5 +1,6 @@
 package com.example.btaudiobalancer.ui
 
+import android.content.pm.PackageManager
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -17,11 +18,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.example.btaudiobalancer.data.DeviceAudioSettings
 import kotlin.math.roundToInt
+
+private const val SECURE_SETTINGS = "android.permission.WRITE_SECURE_SETTINGS"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +38,10 @@ fun MainScreen(
     onRefresh: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    // shortcut: letto a ogni ricomposizione, dopo un grant via adb l'avviso sparisce alla prossima apertura.
+    val hasSecureSettings = ContextCompat.checkSelfPermission(
+        LocalContext.current, SECURE_SETTINGS
+    ) == PackageManager.PERMISSION_GRANTED
 
     Scaffold(
         topBar = {
@@ -64,6 +73,10 @@ fun MainScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
+            if (!hasSecureSettings) {
+                item { PermissionHint() }
+            }
+
             // -- Sezione: device connessi ------------------------------------------
             item {
                 SectionHeader(
@@ -148,6 +161,30 @@ private fun SectionHeader(
         )
         Spacer(Modifier.width(8.dp))
         Badge { Text("$count") }
+    }
+}
+
+/** Mostrato una volta in cima alla lista finche' manca il permesso che rende affidabile il balance. */
+@Composable
+private fun PermissionHint() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "Per bilanciare l'audio di sistema serve un permesso da concedere una volta dal PC. " +
+                    "Senza, il bilanciamento può non avere effetto: il comando è nel README.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
     }
 }
 
@@ -353,26 +390,6 @@ private fun BalanceControl(
                 Text("Centra", style = MaterialTheme.typography.labelSmall)
             }
         }
-
-        // Nota informativa sul supporto del bilanciamento
-        Spacer(Modifier.height(4.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(
-                Icons.Default.Info,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                "Usa DynamicsProcessing (sessione globale) -- applicato via hardware. Lo slider di accessibilità di Android rimarrà al centro.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-            )
-        }
     }
 }
 
@@ -461,13 +478,6 @@ private fun BoostControl(
             Text("+15dB", style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-
-        // LoudnessEnhancer note
-        Text(
-            "Usa LoudnessEnhancer (sessione globale) -- funziona su tutti i device",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-        )
     }
 }
 

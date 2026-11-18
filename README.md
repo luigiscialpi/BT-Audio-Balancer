@@ -20,7 +20,7 @@ App Android che ricorda bilanciamento L/R e amplificazione per ogni dispositivo 
   adb shell pm grant com.example.btaudiobalancer android.permission.WRITE_SECURE_SETTINGS
   ```
 
-  Senza il permesso l'app ripiega su altre strategie (DynamicsProcessing, `setParameters`) che dipendono dal telefono e possono non avere effetto.
+  Senza il permesso l'app ripiega su altre strategie (DynamicsProcessing, `setParameters`) che dipendono dal telefono e possono non avere effetto. Finché il permesso manca, in cima alla lista compare un avviso.
 
 ## Meccanismi audio
 

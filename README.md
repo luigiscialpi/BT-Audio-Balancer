@@ -7,7 +7,7 @@ App Android che ricorda bilanciamento L/R e amplificazione per ogni dispositivo 
 - Per ogni dispositivo (riconosciuto dal MAC address) si salvano: bilanciamento L/R (da -1 a +1), amplificazione (da 0 a +15 dB, a passi di 1 dB) e un interruttore per disabilitare il profilo.
 - Il profilo si crea dall'app: con il dispositivo connesso, muovi uno slider (si salva al rilascio) o l'interruttore. Dalla sezione "Profili salvati" si modifica o si elimina.
 - Quando un dispositivo audio con un profilo si connette, un servizio in primo piano applica gli effetti; quando si disconnette li azzera. I dispositivi senza profilo e quelli non audio (orologi, mouse...) vengono ignorati.
-- Gli effetti valgono per tutto l'audio del telefono, non per un solo dispositivo. Con più dispositivi connessi vale il profilo dell'ultimo connesso; se si disconnette, torna quello del precedente.
+- Gli effetti valgono per tutto l'audio del telefono, non per un solo dispositivo. Con più dispositivi connessi vale il profilo dell'ultimo connesso; se si disconnette, o se ne elimini il profilo, torna quello del precedente.
 - Dopo che il sistema uccide il processo, il servizio riparte e riapplica i profili dei dispositivi A2DP ancora connessi.
 
 ## Requisiti e permessi

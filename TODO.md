@@ -15,9 +15,10 @@ Si spunta `[x]` nella stessa patch che chiude l'attività. Ogni voce ha un ID da
 - [x] **M1** `LoudnessEnhancer`: l'istanza si riusa e a ogni modifica si aggiorna solo `setTargetGain` (si libera con boost 0, reset o release). Se l'effetto non risponde (es. audioserver riavviato) si ricrea e si riprova una volta. Prima, se `setTargetGain` falliva su un'istanza appena creata, questa restava aperta senza essere rilasciata.
 - [x] **M2** `ACTION_RESET` non chiama `startForeground` ma il receiver usa `startForegroundService`: rischio `ForegroundServiceDidNotStartInTimeException`.
 - [ ] **M3** Senza `BLUETOOTH_CONNECT` (Android 14+) `startForeground` può lanciare `SecurityException` dal percorso UI.
-- [ ] **M4** Eliminare il profilo del device attivo non azzera gli effetti.
+- [x] **M4** Eliminare il profilo di un device connesso manda al service lo stesso `ACTION_RESET` della disconnessione: se era l'attivo si riapplica il profilo del precedente o si azzera. Per i device non connessi non parte nessun comando. `MainViewModel` ora ha un solo punto (`sendToService`) per parlare col service.
 - [ ] **M5** Lista "connessi": `isConnected` via reflection su API nascosta (se fallisce risultano connessi tutti i device accoppiati) e aggiornamento solo in `onResume` o a mano. (I device non audio sono già esclusi.)
 - [ ] **M6** `BootReceiver` non fa nulla e non serve: dopo un riavvio nessun device è connesso e `ACL_CONNECTED` copre la riconnessione. Eliminarlo insieme a `RECEIVE_BOOT_COMPLETED`.
+- [ ] **M7** Un device connesso che ottiene un profilo mentre un altro è già attivo (profilo creato dalla UI, anche dopo averlo eliminato) non entra nell'elenco del service: il profilo si salva ma non si applica, e se l'altro device si disconnette il suo non viene ripristinato. `ACTION_UPDATE` aggiunge un device all'elenco solo se questo è vuoto.
 
 ## UX/UI
 

@@ -4,6 +4,7 @@ import android.app.Application
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.content.Intent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -102,29 +103,34 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (_uiState.value.connectedDevices.none { it.deviceAddress == settings.deviceAddress }) return
 
         // Delega l'applicazione al Service (che ha l'unica istanza di AudioEffectApplier)
-        val context = getApplication<Application>()
-        val intent = AudioEffectService.intentUpdate(
-            context = context,
+        sendToService(AudioEffectService.intentUpdate(
+            context = getApplication<Application>(),
             mac = settings.deviceAddress,
             name = settings.deviceName,
             balance = settings.balance,
             boostMb = settings.boostMb,
             enabled = settings.enabled
-        )
-        try {
-            // Poiché l'utente sta interagendo con l'interfaccia (UI attiva), possiamo usare startService.
-            // Se il Service è già attivo in Foreground (perché le cuffie sono connesse), l'intent
-            // viene consegnato normalmente a onStartCommand.
-            context.startService(intent)
-        } catch (e: Exception) {
-            android.util.Log.w("MainViewModel",
-                "startService failed, settings saved: ${e.message}")
-        }
+        ))
     }
 
     fun deleteDevice(mac: String) {
         viewModelScope.launch {
             repository.delete(mac)
+        }
+        // Se e' connesso potrebbe essere quello attivo: con lo stesso comando della disconnessione
+        // il service lo toglie dall'elenco e riapplica il profilo del precedente, o azzera.
+        val device = _uiState.value.connectedDevices.find { it.deviceAddress == mac } ?: return
+        sendToService(AudioEffectService.intentReset(getApplication<Application>(), mac, device.deviceName))
+    }
+
+    private fun sendToService(intent: Intent) {
+        try {
+            // Poiché l'utente sta interagendo con l'interfaccia (UI attiva), possiamo usare startService.
+            // Se il Service è già attivo in Foreground (perché le cuffie sono connesse), l'intent
+            // viene consegnato normalmente a onStartCommand.
+            getApplication<Application>().startService(intent)
+        } catch (e: Exception) {
+            android.util.Log.w("MainViewModel", "startService failed: ${e.message}")
         }
     }
 

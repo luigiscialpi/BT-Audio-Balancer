@@ -6,7 +6,7 @@ Si spunta `[x]` nella stessa patch che chiude l'attività. Ogni voce ha un ID da
 
 - [x] **B1** Salvataggio e applicazione automatici all'apertura dell'app (`DeviceCard`, `MainViewModel.updateAndApply`): può sovrascrivere il profilo con i valori di default, applica il profilo di un device non connesso, crea profili per device non audio.
 - [x] **B2** Più device Bluetooth: effetti persi o sostituiti. Un device senza profilo diventa "attivo" senza toccare gli effetti; alla disconnessione dell'attivo non si riapplica il profilo del device rimasto; il reset scrive `master_balance=0` anche se il device non era attivo; `BluetoothReceiver` reagisce anche ai device non audio.
-- [ ] **B3** Effetti persi dopo l'uccisione del processo: il restart `START_STICKY` arriva con intent nullo e il service non fa nulla, quindi gli effetti restano spenti fino alla riconnessione. Da rileggere dal sistema i device A2DP già connessi (`getProfileProxy`). La race tra i comandi è chiusa con B2 (coda in `AudioEffectService`).
+- [x] **B3** Effetti persi dopo l'uccisione del processo: al restart `START_STICKY` (intent nullo) il service chiama `startForeground`, rilegge dal sistema i device A2DP connessi (`getProfileProxy`) e riapplica i loro profili; se non c'è nulla da ripristinare si ferma. La race tra i comandi era già chiusa con B2 (coda in `AudioEffectService`).
 - [x] **B4** L'interruttore "abilitato" non azzera gli effetti già applicati (`AudioEffectApplier.apply`, uscita anticipata).
 - [ ] **B5** Balance, da verificare su device: ordine delle strategie diverso dall'handoff (DynamicsProcessing prima di Settings), `Settings.System.canWrite` non copre `WRITE_SECURE_SETTINGS`, effetti sulla sessione 0 deprecati dalla documentazione Android.
 

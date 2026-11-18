@@ -5,6 +5,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.Intent
 import android.os.IBinder
@@ -28,6 +30,8 @@ import kotlinx.coroutines.launch
  * globali, quindi vale il profilo dell'ultimo connesso; quando si disconnette torna
  * quello del device precedente, e se non ne resta nessuno azzera e si ferma.
  * I comandi passano da una coda e vengono eseguiti uno alla volta.
+ * Se il sistema riavvia il service dopo averne ucciso il processo (intent nullo), i device
+ * connessi si rileggono dal sistema (restoreConnected).
  */
 class AudioEffectService : Service() {
 
@@ -115,13 +119,45 @@ class AudioEffectService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Restart del sistema senza intent: non c'e' nulla da eseguire (vedi B3 nel TODO)
-        intent ?: return START_STICKY
         // Il sistema vuole startForeground subito dopo startForegroundService, qualunque sia
-        // l'azione; il testo con il nome del device lo mette handle().
+        // l'azione (anche al restart senza intent); il testo con il nome del device lo mette handle().
         startForeground(NOTIF_ID, buildNotification("Effetti audio attivi"))
-        commands.trySend(intent to startId)
+        if (intent == null) restoreConnected(startId) else commands.trySend(intent to startId)
         return START_STICKY
+    }
+
+    /**
+     * Restart del sistema senza intent: gli effetti sono andati persi con il processo.
+     * Si rileggono i device A2DP gia' connessi e si accodano come nuove connessioni; quelli
+     * senza profilo vengono ignorati e, se non resta nulla, il service si ferma da solo.
+     * shortcut: solo A2DP (niente LE Audio) e l'ordine di connessione originale non si conosce,
+     * vale quello restituito dal sistema; da raffinare se serve.
+     */
+    private fun restoreConnected(startId: Int) {
+        val adapter = getSystemService(BluetoothManager::class.java)?.adapter
+        val listener = object : BluetoothProfile.ServiceListener {
+            override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
+                try {
+                    val devices = proxy.connectedDevices
+                    for (d in devices) {
+                        commands.trySend(intentApply(this@AudioEffectService, d.address, d.name ?: d.address) to startId)
+                    }
+                    if (devices.isEmpty()) stopSelf(startId)
+                } catch (e: SecurityException) {
+                    stopSelf(startId) // senza BLUETOOTH_CONNECT non si sa chi e' connesso
+                } finally {
+                    adapter?.closeProfileProxy(profile, proxy)
+                }
+            }
+
+            override fun onServiceDisconnected(profile: Int) {}
+        }
+        val asked = try {
+            adapter != null && adapter.isEnabled && adapter.getProfileProxy(this, listener, BluetoothProfile.A2DP)
+        } catch (e: SecurityException) {
+            false
+        }
+        if (!asked) stopSelf(startId)
     }
 
     private suspend fun handle(intent: Intent, startId: Int) {

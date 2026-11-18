@@ -48,7 +48,7 @@ class AudioEffectApplier(private val context: Context) {
     /**
      * True se abbiamo applicato qualcosa che reset() deve annullare.
      * shortcut: vive solo in memoria, quindi dopo la morte del processo un master_balance
-     * scritto in Settings resta finche' un nuovo apply non lo sovrascrive (vedi B3).
+     * scritto in Settings resta finche' un nuovo apply non lo sovrascrive.
      */
     private var applied = false
 

@@ -21,7 +21,7 @@ BtAudioBalancer/app/src/main/java/com/example/btaudiobalancer/
 │   └── BluetoothAudio.kt             ← isAudio(): esclude i device non audio (orologi, mouse...)
 18: ├── data/
 19: │   ├── DeviceAudioSettings.kt        ← data class: mac, name, balance(-1..1), boostMb(0..1500), enabled
-20: │   └── DeviceSettingsRepository.kt   ← DataStore: chiavi prefissate per MAC, allDevices Flow
+20: │   └── DeviceSettingsRepository.kt   ← DataStore (iniettabile nel costruttore): chiavi prefissate per MAC, allDevices Flow; coperto da test
 21: ├── receiver/
 22: │   ├── BluetoothReceiver.kt          ← ACL_CONNECTED/DISCONNECTED → passa MAC e avvia AudioEffectService
 23: │   └── BootReceiver.kt               ← placeholder per BOOT_COMPLETED
@@ -70,7 +70,7 @@ chmod +x setup.sh && ./setup.sh
 # Compila l'APK di debug
 ./gradlew assembleDebug
 
-# Test unitari (JVM, senza dispositivo)
+# Test unitari (JVM, senza dispositivo): ConnectedDevicesTest, DeviceSettingsRepositoryTest
 ./gradlew testDebugUnitTest
 
 # Installa l'app via ADB (quando il dispositivo è connesso)

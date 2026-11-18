@@ -1,6 +1,7 @@
 package com.example.btaudiobalancer.data
 
 import android.content.Context
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -9,7 +10,9 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "device_settings")
 
-class DeviceSettingsRepository(private val context: Context) {
+class DeviceSettingsRepository(private val dataStore: DataStore<Preferences>) {
+
+    constructor(context: Context) : this(context.dataStore)
 
     private fun balanceKey(mac: String) = floatPreferencesKey("${mac}_balance")
     private fun boostKey(mac: String)   = intPreferencesKey("${mac}_boost")
@@ -17,7 +20,7 @@ class DeviceSettingsRepository(private val context: Context) {
     private fun enabledKey(mac: String) = booleanPreferencesKey("${mac}_enabled")
 
     /** Flusso con tutti i device salvati. */
-    val allDevices: Flow<List<DeviceAudioSettings>> = context.dataStore.data.map { prefs ->
+    val allDevices: Flow<List<DeviceAudioSettings>> = dataStore.data.map { prefs ->
         prefs.asMap().keys
             .mapNotNull { key ->
                 val raw = key.name
@@ -37,7 +40,7 @@ class DeviceSettingsRepository(private val context: Context) {
 
     /** Flusso per un singolo dispositivo. */
     fun deviceFlow(mac: String): Flow<DeviceAudioSettings?> =
-        context.dataStore.data.map { prefs ->
+        dataStore.data.map { prefs ->
             if (prefs[nameKey(mac)] == null) null
             else DeviceAudioSettings(
                 deviceAddress = mac,
@@ -50,7 +53,7 @@ class DeviceSettingsRepository(private val context: Context) {
 
     /** Salva (o aggiorna) le impostazioni di un device. */
     suspend fun save(settings: DeviceAudioSettings) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[nameKey(settings.deviceAddress)]    = settings.deviceName
             prefs[balanceKey(settings.deviceAddress)] = settings.balance
             prefs[boostKey(settings.deviceAddress)]   = settings.boostMb
@@ -60,7 +63,7 @@ class DeviceSettingsRepository(private val context: Context) {
 
     /** Rimuove le impostazioni di un device. */
     suspend fun delete(mac: String) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs.remove(nameKey(mac))
             prefs.remove(balanceKey(mac))
             prefs.remove(boostKey(mac))

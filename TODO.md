@@ -33,4 +33,4 @@ Si spunta `[x]` nella stessa patch che chiude l'attività. Ogni voce ha un ID da
 ## Test
 
 - [x] **T1** JUnit 4 introdotto (`./gradlew testDebugUnitTest`). Primo test: `ConnectedDevicesTest`, sulla regola "vince l'ultimo connesso, alla disconnessione torna il precedente", estratta da `AudioEffectService` in `ConnectedDevices`.
-- [ ] **T2** Test del salvataggio per-device (chiavi `<mac>_*` di `DeviceSettingsRepository`): oggi il DataStore è legato al `Context`; iniettarlo nel costruttore lo rende testabile in JVM con `PreferenceDataStoreFactory`.
+- [x] **T2** `DeviceSettingsRepository` riceve il `DataStore` nel costruttore (da `Context` resta un costruttore secondario, i chiamanti non cambiano). `DeviceSettingsRepositoryTest` copre il salvataggio per-device (chiavi `<mac>_*`): rilettura dello stesso device, device sconosciuto, impostazioni separate per device, aggiornamento senza duplicati, eliminazione.

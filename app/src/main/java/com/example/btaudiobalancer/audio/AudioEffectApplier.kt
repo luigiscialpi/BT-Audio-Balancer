@@ -242,21 +242,29 @@ class AudioEffectApplier(private val context: Context) {
     // -- Boost ---------------------------------------------------------------------
 
     /**
+     * Riusa l'effetto esistente e ne aggiorna solo il guadagno.
+     *
      * @param boostMb millibel 0..1500 (0 = nessun boost, 1500 = +15 dB)
      */
     private fun applyBoost(boostMb: Int) {
-        try {
+        if (boostMb <= 0) {
             releaseBoost()
-            if (boostMb <= 0) return
-
-            // audioSessionId = 0 -> sessione globale (tutto l'audio di sistema)
-            loudnessEnhancer = LoudnessEnhancer(0).apply {
-                setTargetGain(boostMb)
-                enabled = true
+            return
+        }
+        // Due tentativi: se l'effetto esistente non risponde piu' (es. audioserver riavviato)
+        // lo si butta e se ne crea uno nuovo.
+        repeat(2) {
+            try {
+                // audioSessionId = 0 -> sessione globale (tutto l'audio di sistema)
+                val effect = loudnessEnhancer ?: LoudnessEnhancer(0).also { loudnessEnhancer = it }
+                effect.setTargetGain(boostMb)
+                effect.enabled = true
+                Log.d(TAG, "LoudnessEnhancer set to ${boostMb}mB (${boostMb / 100f} dB)")
+                return
+            } catch (e: Exception) {
+                Log.e(TAG, "LoudnessEnhancer failed: ${e.message}")
+                releaseBoost()
             }
-            Log.d(TAG, "LoudnessEnhancer set to ${boostMb}mB (${boostMb / 100f} dB)")
-        } catch (e: Exception) {
-            Log.e(TAG, "LoudnessEnhancer failed: ${e.message}")
         }
     }
 

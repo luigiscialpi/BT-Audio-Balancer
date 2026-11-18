@@ -12,7 +12,7 @@ Si spunta `[x]` nella stessa patch che chiude l'attività. Ogni voce ha un ID da
 
 ## Minori
 
-- [ ] **M1** `LoudnessEnhancer` rilasciato e ricreato a ogni modifica: aggiornare `setTargetGain` sull'istanza esistente.
+- [x] **M1** `LoudnessEnhancer`: l'istanza si riusa e a ogni modifica si aggiorna solo `setTargetGain` (si libera con boost 0, reset o release). Se l'effetto non risponde (es. audioserver riavviato) si ricrea e si riprova una volta. Prima, se `setTargetGain` falliva su un'istanza appena creata, questa restava aperta senza essere rilasciata.
 - [x] **M2** `ACTION_RESET` non chiama `startForeground` ma il receiver usa `startForegroundService`: rischio `ForegroundServiceDidNotStartInTimeException`.
 - [ ] **M3** Senza `BLUETOOTH_CONNECT` (Android 14+) `startForeground` può lanciare `SecurityException` dal percorso UI.
 - [ ] **M4** Eliminare il profilo del device attivo non azzera gli effetti.

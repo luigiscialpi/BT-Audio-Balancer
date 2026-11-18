@@ -8,7 +8,7 @@ Si spunta `[x]` nella stessa patch che chiude l'attività. Ogni voce ha un ID da
 - [x] **B2** Più device Bluetooth: effetti persi o sostituiti. Un device senza profilo diventa "attivo" senza toccare gli effetti; alla disconnessione dell'attivo non si riapplica il profilo del device rimasto; il reset scrive `master_balance=0` anche se il device non era attivo; `BluetoothReceiver` reagisce anche ai device non audio.
 - [x] **B3** Effetti persi dopo l'uccisione del processo: al restart `START_STICKY` (intent nullo) il service chiama `startForeground`, rilegge dal sistema i device A2DP connessi (`getProfileProxy`) e riapplica i loro profili; se non c'è nulla da ripristinare si ferma. La race tra i comandi era già chiusa con B2 (coda in `AudioEffectService`).
 - [x] **B4** L'interruttore "abilitato" non azzera gli effetti già applicati (`AudioEffectApplier.apply`, uscita anticipata).
-- [ ] **B5** Balance, da verificare su device: ordine delle strategie diverso dall'handoff (DynamicsProcessing prima di Settings), `Settings.System.canWrite` non copre `WRITE_SECURE_SETTINGS`, effetti sulla sessione 0 deprecati dalla documentazione Android.
+- [x] **B5** Balance: l'ordine ora è Settings → DynamicsProcessing → `setParameters`, come nell'handoff (prima DynamicsProcessing riusciva anche senza effetto e Settings non veniva mai provato). Si scrive `master_balance` senza `Settings.System.canWrite`, che guarda solo `WRITE_SETTINGS` e non `WRITE_SECURE_SETTINGS` (verificato sul sorgente AOSP). Il centro e il reset toccano `master_balance` solo se l'aveva spostato l'app. Da verificare su device: boost e DynamicsProcessing sulla sessione 0 (deprecata) potrebbero non avere effetto; il README (R1) lo dichiara.
 
 ## Minori
 

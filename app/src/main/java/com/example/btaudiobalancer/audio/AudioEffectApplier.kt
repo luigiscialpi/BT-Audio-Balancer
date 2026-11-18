@@ -29,10 +29,12 @@ enum class BalanceResult {
 /**
  * Applica bilanciamento L/R e boost al sistema audio.
  *
- * Bilanciamento: tripla strategia con fallback:
- *   1. Settings.System.putFloat("master_balance", value) -- AOSP/Android 12+, richiede WRITE_SETTINGS
- *   2. AudioManager.setParameters("master_balance=value") -- MIUI e vendor custom
- *   3. Se entrambi falliscono, ritorna NOT_SUPPORTED per feedback UI
+ * Bilanciamento: tripla strategia, vale la prima che riesce:
+ *   1. Settings.System.putFloat("master_balance", value) -- richiede WRITE_SECURE_SETTINGS (adb)
+ *      o WRITE_SETTINGS; e' l'unica verificata su device reale
+ *   2. DynamicsProcessing sulla sessione 0 -- deprecata: puo' riuscire senza avere effetto, quindi dopo Settings
+ *   3. AudioManager.setParameters("master_balance=value") -- MIUI e vendor custom, best effort
+ *   Se nessuna riesce ritorna NOT_SUPPORTED per feedback UI
  *
  * Boost: LoudnessEnhancer su audioSessionId=0 (sessione globale) --
  *   funziona su tutti i device Android 9+ senza root.
@@ -46,11 +48,12 @@ class AudioEffectApplier(private val context: Context) {
     private var dynamicsProcessing: android.media.audiofx.DynamicsProcessing? = null
 
     /**
-     * True se abbiamo applicato qualcosa che reset() deve annullare.
+     * True se abbiamo spostato il balance dal centro e va riportato a zero. Da false non si scrive
+     * nulla, per non sovrascrivere il master_balance che l'utente ha impostato dall'Accessibilita'.
      * shortcut: vive solo in memoria, quindi dopo la morte del processo un master_balance
      * scritto in Settings resta finche' un nuovo apply non lo sovrascrive.
      */
-    private var applied = false
+    private var balanceSet = false
 
     /**
      * Applica le impostazioni di un device.
@@ -65,8 +68,6 @@ class AudioEffectApplier(private val context: Context) {
             return BalanceResult.NEUTRAL
         }
 
-        applied = true
-
         val balanceResult = applyBalance(settings.balance)
         applyBoost(settings.boostMb)
         Log.i(TAG, "Applied: device=${settings.deviceName} " +
@@ -78,24 +79,18 @@ class AudioEffectApplier(private val context: Context) {
     /**
      * Ripristina i valori neutri (centro, nessun boost).
      * Chiamare quando il device attivo si disconnette o viene disabilitato.
-     * Se non c'e' nulla di applicato non fa niente, per non sovrascrivere il
-     * master_balance che l'utente ha impostato dall'Accessibilita'.
      */
     fun reset() {
-        if (!applied) return
-
         applyBalance(0f)
         releaseBoost()
-        releaseDynamicsProcessing()
-        applied = false
         Log.i(TAG, "Reset to neutral")
     }
 
     // -- Balance (tripla strategia) -----------------------------------------------
 
     /**
-     * Tenta di applicare il bilanciamento L/R usando due strategie in ordine
-     * di affidabilita'. Ritorna il risultato per consentire feedback UI.
+     * Tenta di applicare il bilanciamento L/R con le strategie in ordine.
+     * Ritorna il risultato per consentire feedback UI.
      *
      * @param balance da -1.0 (tutto sinistra) a +1.0 (tutto destra), 0 = centro
      * @return quale strategia ha avuto successo
@@ -103,42 +98,38 @@ class AudioEffectApplier(private val context: Context) {
     private fun applyBalance(balance: Float): BalanceResult {
         val clamped = balance.coerceIn(-1f, 1f)
 
-        // Se clamped e' 0f, applichiamo 0f e proviamo comunque il DynamicsProcessing
-        // per resettare i guadagni dei canali.
-        if (tryDynamicsProcessing(clamped)) {
-            Log.d(TAG, "Balance set via DynamicsProcessing: $clamped")
-            return if (clamped == 0f) BalanceResult.NEUTRAL else BalanceResult.APPLIED_VIA_DYNAMICS_PROCESSING
-        }
-
         if (clamped == 0f) {
-            trySettingsSystem(0f)
-            trySetParameters(0f)
+            // Il centro azzera tutte le strategie (non si sa quale sia stata usata), ma solo se
+            // abbiamo spostato noi il balance: altrimenti si scriverebbe sopra quello dell'utente.
+            if (balanceSet) {
+                trySettingsSystem(0f)
+                trySetParameters(0f)
+                releaseDynamicsProcessing()
+                balanceSet = false
+            }
             return BalanceResult.NEUTRAL
         }
 
-        // Fallback 1: Settings.System (AOSP/Android 12+, richiede WRITE_SETTINGS)
-        if (trySettingsSystem(clamped)) {
-            Log.d(TAG, "Balance set via Settings.System: $clamped")
-            return BalanceResult.APPLIED_VIA_SETTINGS
+        val result = when {
+            trySettingsSystem(clamped) -> {
+                releaseDynamicsProcessing() // un guadagno rimasto da un apply precedente si sommerebbe
+                BalanceResult.APPLIED_VIA_SETTINGS
+            }
+            tryDynamicsProcessing(clamped) -> BalanceResult.APPLIED_VIA_DYNAMICS_PROCESSING
+            trySetParameters(clamped) -> BalanceResult.APPLIED_VIA_SET_PARAMETERS
+            else -> BalanceResult.NOT_SUPPORTED
         }
-
-        // Fallback 2: AudioManager.setParameters (MIUI e vendor custom)
-        if (trySetParameters(clamped)) {
-            Log.d(TAG, "Balance set via setParameters: $clamped")
-            return BalanceResult.APPLIED_VIA_SET_PARAMETERS
-        }
-
-        // Nessuna strategia ha funzionato
-        Log.w(TAG, "Balance NOT supported on this device")
-        return BalanceResult.NOT_SUPPORTED
+        if (result == BalanceResult.NOT_SUPPORTED) Log.w(TAG, "Balance NOT supported on this device")
+        else balanceSet = true
+        return result
     }
 
     /**
-     * Tenta di applicare il bilanciamento L/R usando DynamicsProcessing.
-     * Questa API e' disponibile a partire da Android 9 (API 28) ed e' la piu'
-     * affidabile perche' applica il guadagno direttamente a livello DSP.
+     * Tenta di applicare il bilanciamento L/R usando DynamicsProcessing (API 28+).
+     * Applica il guadagno a livello DSP, ma sulla sessione 0 (deprecata) la creazione puo'
+     * riuscire senza che l'audio cambi: per questo viene dopo Settings.
      *
-     * @return true se l'effetto e' stato applicato con successo
+     * @return true se l'effetto e' stato creato e configurato senza errori
      */
     private fun tryDynamicsProcessing(balance: Float): Boolean {
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.P) {
@@ -216,27 +207,16 @@ class AudioEffectApplier(private val context: Context) {
 
     /**
      * Tenta di scrivere il balance in Settings.System.
-     * Richiede il permesso WRITE_SETTINGS concesso dall'utente.
+     * Con WRITE_SECURE_SETTINGS (adb) il provider non controlla WRITE_SETTINGS, mentre
+     * Settings.System.canWrite guarda solo WRITE_SETTINGS: per questo si prova a scrivere e basta.
      *
      * @return true se la scrittura e' andata a buon fine
      */
     private fun trySettingsSystem(balance: Float): Boolean {
         return try {
-            if (!Settings.System.canWrite(context)) {
-                Log.d(TAG, "trySettingsSystem: WRITE_SETTINGS NOT granted")
-                return false
-            }
-            Log.d(TAG, "trySettingsSystem: Attempting to write master_balance = $balance")
-            Settings.System.putFloat(
-                context.contentResolver,
-                "master_balance",
-                balance
-            )
-            val readBack = Settings.System.getFloat(context.contentResolver, "master_balance", -999f)
-            Log.d(TAG, "trySettingsSystem: Success. Read back master_balance = $readBack")
-            true
-        } catch (e: Exception) {
-            Log.w(TAG, "trySettingsSystem: Failed to write/verify master_balance: ${e.message}", e)
+            Settings.System.putFloat(context.contentResolver, "master_balance", balance)
+        } catch (e: Exception) { // SecurityException senza permessi
+            Log.d(TAG, "trySettingsSystem: master_balance not written: ${e.message}")
             false
         }
     }

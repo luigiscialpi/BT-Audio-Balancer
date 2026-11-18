@@ -38,8 +38,7 @@ class AudioEffectService : Service() {
     /** Comandi (intent e startId) in ordine di arrivo: l'applier non e' thread-safe. */
     private val commands = Channel<Pair<Intent, Int>>(Channel.UNLIMITED)
 
-    /** MAC -> nome dei device connessi, in ordine di connessione: l'ultimo e' l'attivo. */
-    private val connected = LinkedHashMap<String, String>()
+    private val connected = ConnectedDevices()
 
     companion object {
         const val ACTION_APPLY  = "com.example.btaudiobalancer.APPLY"
@@ -135,21 +134,18 @@ class AudioEffectService : Service() {
                     // Senza profilo non si toccano gli effetti: potrebbero essere di un altro device
                     Log.i(TAG, "$name: no saved profile, ignoring")
                 } else {
-                    connected.remove(mac) // se c'era gia' torna in fondo, cioe' diventa l'attivo
-                    connected[mac] = name
+                    connected.connect(mac, name)
                     applier.apply(settings)
                 }
             }
             ACTION_RESET -> {
-                val wasActive = connected.keys.lastOrNull() == mac
-                connected.remove(mac)
-                if (wasActive) applyActive()
+                if (connected.disconnect(mac)) applyActive()
             }
             ACTION_UPDATE -> {
                 // Service appena avviato dalla UI, che considera connesso questo device: ci si fida
-                if (connected.isEmpty()) connected[mac] = name
+                if (connected.isEmpty) connected.connect(mac, name)
                 // Un device secondario si salva (lo fa il ViewModel) ma non si applica
-                if (connected.keys.last() == mac) {
+                if (connected.activeMac == mac) {
                     applier.apply(DeviceAudioSettings(
                         deviceAddress = mac,
                         deviceName    = name,
@@ -160,17 +156,17 @@ class AudioEffectService : Service() {
                 }
             }
         }
-        if (connected.isEmpty()) {
+        if (connected.isEmpty) {
             applier.reset()
             stopSelf(startId) // ignorato se nel frattempo e' arrivato un comando piu' recente
         } else {
-            startForeground(NOTIF_ID, buildNotification("Connesso: ${connected.values.last()}"))
+            startForeground(NOTIF_ID, buildNotification("Connesso: ${connected.activeName}"))
         }
     }
 
     /** Applica il profilo dell'ultimo device connesso; azzera se non ce n'e' o non ha piu' un profilo. */
     private suspend fun applyActive() {
-        val settings = connected.keys.lastOrNull()?.let { repository.getOnce(it) }
+        val settings = connected.activeMac?.let { repository.getOnce(it) }
         if (settings == null) applier.reset() else applier.apply(settings)
     }
 

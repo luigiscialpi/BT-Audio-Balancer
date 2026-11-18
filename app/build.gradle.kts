@@ -46,5 +46,6 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
+    testImplementation(libs.junit)
     debugImplementation(libs.androidx.ui.tooling)
 }

@@ -6,6 +6,7 @@ App Android in Kotlin + Jetpack Compose che bilancia L/R e amplifica l'audio di 
 ## Stack
 - Kotlin + Jetpack Compose Material3
 - DataStore Preferences (persistenza)
+- JUnit 4 per i test unitari JVM (`app/src/test`)
 - `minSdk 26`, `targetSdk 35`, AGP 8.5.2, Kotlin 2.0.21
 
 ## Architettura
@@ -16,6 +17,8 @@ BtAudioBalancer/app/src/main/java/com/example/btaudiobalancer/
 15: ├── MainActivity.kt                   ← entry Compose, rimossi permessi bloccanti all'avvio
 16: ├── audio/
 17: │   └── AudioEffectApplier.kt         ← CORE: balance tripla strategia (System/DSP/setParameters) + LoudnessEnhancer
+├── bluetooth/
+│   └── BluetoothAudio.kt             ← isAudio(): esclude i device non audio (orologi, mouse...)
 18: ├── data/
 19: │   ├── DeviceAudioSettings.kt        ← data class: mac, name, balance(-1..1), boostMb(0..1500), enabled
 20: │   └── DeviceSettingsRepository.kt   ← DataStore: chiavi prefissate per MAC, allDevices Flow
@@ -23,7 +26,8 @@ BtAudioBalancer/app/src/main/java/com/example/btaudiobalancer/
 22: │   ├── BluetoothReceiver.kt          ← ACL_CONNECTED/DISCONNECTED → passa MAC e avvia AudioEffectService
 23: │   └── BootReceiver.kt               ← placeholder per BOOT_COMPLETED
 24: ├── service/
-25: │   └── AudioEffectService.kt         ← ForegroundService: applica/aggiorna (via ACTION_UPDATE) o resetta settings per MAC attivo
+25: │   ├── AudioEffectService.kt         ← ForegroundService: coda di comandi APPLY/UPDATE/RESET, applica il profilo dell'ultimo device connesso
+│   └── ConnectedDevices.kt           ← elenco dei device connessi in ordine (vale l'ultimo); coperto da test
 26: └── ui/
 27:     ├── MainViewModel.kt              ← refreshConnectedDevices via reflection isConnected(), delega al Service
 28:     ├── MainScreen.kt                 ← LazyColumn: sezione connessi + sezione profili salvati, visualizer L/R
@@ -65,6 +69,9 @@ chmod +x setup.sh && ./setup.sh
 
 # Compila l'APK di debug
 ./gradlew assembleDebug
+
+# Test unitari (JVM, senza dispositivo)
+./gradlew testDebugUnitTest
 
 # Installa l'app via ADB (quando il dispositivo è connesso)
 ./gradlew installDebug

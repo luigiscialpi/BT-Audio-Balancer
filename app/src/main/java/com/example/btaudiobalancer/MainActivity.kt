@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
         val granted = results.values.all { it }
         viewModel.setPermissionGranted(granted)
         if (granted) {
-            viewModel.refreshConnectedDevices(this)
+            viewModel.refreshConnectedDevices()
         }
     }
 
@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
                     savedDevices   = savedDevices,
                     onSettingsChange = { viewModel.updateAndApply(it) },
                     onDelete       = { viewModel.deleteDevice(it) },
-                    onRefresh      = { viewModel.refreshConnectedDevices(this) }
+                    onRefresh      = { viewModel.refreshConnectedDevices() }
                 )
             }
         }
@@ -56,7 +56,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         if (hasBluetoothPermission()) {
-            viewModel.refreshConnectedDevices(this)
+            viewModel.refreshConnectedDevices()
         }
     }
 
@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
         }
         if (missing.isEmpty()) {
             viewModel.setPermissionGranted(true)
-            viewModel.refreshConnectedDevices(this)
+            viewModel.refreshConnectedDevices()
         } else {
             permissionLauncher.launch(missing.toTypedArray())
         }

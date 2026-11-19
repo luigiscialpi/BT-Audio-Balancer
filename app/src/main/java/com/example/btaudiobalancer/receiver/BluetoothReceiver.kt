@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.content.ContextCompat
+import com.example.btaudiobalancer.bluetooth.displayName
 import com.example.btaudiobalancer.bluetooth.isAudio
 import com.example.btaudiobalancer.service.AudioEffectService
 
@@ -24,7 +25,7 @@ class BluetoothReceiver : BroadcastReceiver() {
         if (!device.isAudio()) return
 
         val mac  = device.address ?: return
-        val name = try { device.name ?: mac } catch (_: SecurityException) { mac }
+        val name = device.displayName()
 
         when (intent.action) {
             BluetoothDevice.ACTION_ACL_CONNECTED -> {

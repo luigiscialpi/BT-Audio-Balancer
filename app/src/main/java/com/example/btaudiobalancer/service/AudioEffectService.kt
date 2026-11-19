@@ -5,8 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.bluetooth.BluetoothManager
-import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.Intent
 import android.os.IBinder
@@ -14,6 +12,8 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.btaudiobalancer.MainActivity
 import com.example.btaudiobalancer.audio.AudioEffectApplier
+import com.example.btaudiobalancer.bluetooth.displayName
+import com.example.btaudiobalancer.bluetooth.queryConnectedA2dp
 import com.example.btaudiobalancer.data.DeviceAudioSettings
 import com.example.btaudiobalancer.data.DeviceSettingsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -139,34 +139,17 @@ class AudioEffectService : Service() {
      * Restart del sistema senza intent: gli effetti sono andati persi con il processo.
      * Si rileggono i device A2DP gia' connessi e si accodano come nuove connessioni; quelli
      * senza profilo vengono ignorati e, se non resta nulla, il service si ferma da solo.
-     * shortcut: solo A2DP (niente LE Audio) e l'ordine di connessione originale non si conosce,
-     * vale quello restituito dal sistema; da raffinare se serve.
+     * shortcut: l'ordine di connessione originale non si conosce, vale quello restituito
+     * dal sistema; da raffinare se serve.
      */
     private fun restoreConnected(startId: Int) {
-        val adapter = getSystemService(BluetoothManager::class.java)?.adapter
-        val listener = object : BluetoothProfile.ServiceListener {
-            override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
-                try {
-                    val devices = proxy.connectedDevices
-                    for (d in devices) {
-                        commands.trySend(intentApply(this@AudioEffectService, d.address, d.name ?: d.address) to startId)
-                    }
-                    if (devices.isEmpty()) stopSelf(startId)
-                } catch (e: SecurityException) {
-                    stopSelf(startId) // senza BLUETOOTH_CONNECT non si sa chi e' connesso
-                } finally {
-                    adapter?.closeProfileProxy(profile, proxy)
-                }
+        queryConnectedA2dp { devices ->
+            if (devices.isNullOrEmpty()) {
+                stopSelf(startId) // niente da ripristinare, o non si sa chi e' connesso
+            } else {
+                for (d in devices) commands.trySend(intentApply(this, d.address, d.displayName()) to startId)
             }
-
-            override fun onServiceDisconnected(profile: Int) {}
         }
-        val asked = try {
-            adapter != null && adapter.isEnabled && adapter.getProfileProxy(this, listener, BluetoothProfile.A2DP)
-        } catch (e: SecurityException) {
-            false
-        }
-        if (!asked) stopSelf(startId)
     }
 
     private suspend fun handle(intent: Intent, startId: Int) {

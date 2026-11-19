@@ -1,14 +1,17 @@
 package com.example.btaudiobalancer.ui
 
 import android.app.Application
+import android.bluetooth.BluetoothA2dp
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.btaudiobalancer.bluetooth.isAudio
+import com.example.btaudiobalancer.bluetooth.displayName
+import com.example.btaudiobalancer.bluetooth.queryConnectedA2dp
 import com.example.btaudiobalancer.data.DeviceAudioSettings
 import com.example.btaudiobalancer.data.DeviceSettingsRepository
 import com.example.btaudiobalancer.service.AudioEffectService
@@ -42,47 +45,36 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val savedDevices: StateFlow<List<DeviceAudioSettings>> = repository.allDevices
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /** Il sistema avvisa quando un device A2DP si connette o si disconnette e quando il Bluetooth cambia stato. */
+    private val connectionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = refreshConnectedDevices()
+    }
+
     init {
         viewModelScope.launch {
             savedDevices.collect { saved ->
                 _uiState.update { it.copy(savedDevices = saved) }
             }
         }
+        // Solo broadcast protetti di sistema: non serve il flag di export (anche su Android 14+)
+        app.registerReceiver(connectionReceiver, IntentFilter().apply {
+            addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED)
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+        })
     }
 
-    fun refreshConnectedDevices(context: Context) {
-        val btManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        val adapter: BluetoothAdapter? = btManager.adapter
-        if (adapter == null || !adapter.isEnabled) {
-            _uiState.update { it.copy(connectedDevices = emptyList()) }
-            return
-        }
-        try {
-            val connected = adapter.bondedDevices
-                ?.filter { it.isAudio() }
-                ?.filter { dev ->
-                    // Filtra solo quelli effettivamente connessi (API 14+)
-                    try {
-                        val method = dev.javaClass.getMethod("isConnected")
-                        method.invoke(dev) as? Boolean == true
-                    } catch (_: Exception) {
-                        true // fallback: mostra tutti i paired se non riesci a verificare
-                    }
-                }
-                ?.map { dev ->
-                    val mac  = dev.address
-                    val name = try { dev.name ?: mac } catch (_: SecurityException) { mac }
-                    // Leggi settings salvati se esistono, altrimenti crea entry vuota
-                    val saved = savedDevices.value.find { it.deviceAddress == mac }
-                    saved ?: DeviceAudioSettings(
-                        deviceAddress = mac,
-                        deviceName    = name
-                    )
-                } ?: emptyList()
+    override fun onCleared() {
+        getApplication<Application>().unregisterReceiver(connectionReceiver)
+    }
 
+    fun refreshConnectedDevices() {
+        getApplication<Application>().queryConnectedA2dp { devices ->
+            val connected = devices.orEmpty().map { dev ->
+                // Impostazioni salvate se esistono, altrimenti una scheda vuota
+                savedDevices.value.find { it.deviceAddress == dev.address }
+                    ?: DeviceAudioSettings(deviceAddress = dev.address, deviceName = dev.displayName())
+            }
             _uiState.update { it.copy(connectedDevices = connected) }
-        } catch (e: SecurityException) {
-            _uiState.update { it.copy(hasBluetoothPermission = false) }
         }
     }
 

@@ -75,7 +75,7 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
             if (!hasSecureSettings) {
@@ -95,7 +95,7 @@ fun MainScreen(
                 item {
                     EmptyCard(
                         icon = Icons.Default.BluetoothDisabled,
-                        message = "Nessun dispositivo Bluetooth connesso.\nCollega un auricolare e premi Aggiorna."
+                        message = "Nessun dispositivo Bluetooth connesso.\nCollega un auricolare: comparirà qui."
                     )
                 }
             } else {

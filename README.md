@@ -9,6 +9,7 @@ App Android che ricorda bilanciamento L/R e amplificazione per ogni dispositivo 
 - Quando un dispositivo audio con un profilo si connette, un servizio in primo piano applica gli effetti; quando si disconnette li azzera. I dispositivi senza profilo e quelli non audio (orologi, mouse...) vengono ignorati.
 - Gli effetti valgono per tutto l'audio del telefono, non per un solo dispositivo. Con più dispositivi connessi vale il profilo dell'ultimo connesso; se si disconnette, o se ne elimini il profilo, torna quello del precedente.
 - Dopo che il sistema uccide il processo, il servizio riparte e riapplica i profili dei dispositivi A2DP ancora connessi.
+- L'elenco dei dispositivi connessi nell'app si aggiorna da solo quando un dispositivo A2DP si connette o si disconnette, o il Bluetooth si accende o si spegne.
 
 ## Requisiti e permessi
 
@@ -38,7 +39,8 @@ Il centro (balance 0) e il reset toccano `master_balance` solo se l'app l'aveva 
 
 - L'amplificazione (`LoudnessEnhancer`) e il ripiego DynamicsProcessing agiscono sulla sessione audio globale 0, deprecata dalla documentazione Android: su alcune versioni o telefoni possono non sentirsi.
 - `master_balance` vale per tutte le uscite audio, non solo per il Bluetooth. Se il processo viene ucciso mentre un profilo è applicato, il valore resta finché un nuovo profilo non lo sovrascrive.
-- Il ripristino dopo la morte del processo non copre LE Audio e non conosce l'ordine di connessione originale.
+- Né l'elenco dei connessi nell'app né il ripristino dopo la morte del processo coprono LE Audio: contano solo i dispositivi A2DP. Un dispositivo solo LE Audio riceve il profilo alla connessione (`BluetoothReceiver`) ma nell'app non compare tra i connessi, quindi da lì il profilo non si può creare.
+- Dopo la morte del processo non si conosce l'ordine di connessione originale: vale quello restituito dal sistema.
 
 ## Architettura
 
@@ -51,7 +53,7 @@ app/src/main/java/com/example/btaudiobalancer/
 ├── audio/
 │   └── AudioEffectApplier.kt         ← CORE: balance tripla strategia + LoudnessEnhancer
 ├── bluetooth/
-│   └── BluetoothAudio.kt             ← isAudio(): esclude i device non audio
+│   └── BluetoothAudio.kt             ← isAudio() (esclude i device non audio), displayName(), queryConnectedA2dp() (device A2DP connessi adesso)
 ├── data/
 │   ├── DeviceAudioSettings.kt        ← data class: mac, name, balance(-1..1), boostMb(0..1500), enabled
 │   └── DeviceSettingsRepository.kt   ← DataStore (iniettabile nel costruttore): chiavi prefissate per MAC, allDevices Flow
@@ -61,7 +63,7 @@ app/src/main/java/com/example/btaudiobalancer/
 │   ├── AudioEffectService.kt         ← ForegroundService: coda di comandi APPLY/UPDATE/RESET, applica il profilo dell'ultimo device connesso
 │   └── ConnectedDevices.kt           ← elenco dei device connessi in ordine (vale l'ultimo)
 └── ui/
-    ├── MainViewModel.kt              ← refreshConnectedDevices via reflection isConnected(), delega al Service
+    ├── MainViewModel.kt              ← elenco dei connessi da A2DP, aggiornato dai broadcast di sistema; delega al Service
     ├── MainScreen.kt                 ← LazyColumn: sezione connessi + sezione profili salvati, visualizer L/R
     └── theme/                        ← Color, Type, Theme (dynamic color Android 12+)
 
@@ -74,8 +76,8 @@ Scelte di progetto:
 - **Profili isolati**: il service tiene l'elenco (`connected`) dei device audio connessi che hanno un profilo. Un update dalla UI per un device che non è l'attivo viene solo salvato; se il service non lo conosceva, entra nell'elenco senza scavalcare l'attivo. Alla disconnessione dell'attivo si riapplica il profilo del precedente; se non ne resta nessuno si azzera e il service si ferma.
 - **Comandi in coda**: APPLY, UPDATE e RESET passano da una coda e girano uno alla volta, perché l'applier non è thread-safe.
 - **Salvataggio su azione dell'utente**: gli slider salvano e applicano solo al rilascio (`onValueChangeFinished`), mai alla comparsa della card. Un profilo di un device non connesso viene salvato ma non applicato.
-- **Filtro audio**: `BluetoothReceiver` e la lista "connessi" della UI escludono i device non audio (`isAudio()`).
-- **Ripristino**: dopo un restart senza intent il service rilegge i device A2DP connessi (`getProfileProxy`) e li accoda come nuove connessioni.
+- **Filtro audio**: `BluetoothReceiver` esclude i device non audio (`isAudio()`); la lista "connessi" della UI viene dal profilo A2DP, che per definizione è audio.
+- **Device connessi**: li chiede `queryConnectedA2dp()` (`getProfileProxy` + `getConnectedDevices`), usata sia dalla UI sia dal ripristino. Dopo un restart senza intent il service li accoda come nuove connessioni; la UI si aggiorna con un receiver registrato dal `MainViewModel` (broadcast protetti: `A2DP CONNECTION_STATE_CHANGED`, `ADAPTER STATE_CHANGED`).
 
 ## Build e test
 

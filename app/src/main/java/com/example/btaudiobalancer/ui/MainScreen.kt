@@ -20,8 +20,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.btaudiobalancer.data.DeviceAudioSettings
@@ -281,26 +285,31 @@ fun DeviceCard(
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(Modifier.width(8.dp))
+                // Nome (fino a 2 righe) e, sotto, stato + MAC su una riga: lo stato resta in testa e
+                // il MAC si accorcia per primo. Niente chip, che su schermi stretti toglieva spazio al nome.
+                val primary = MaterialTheme.colorScheme.primary
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = settings.deviceName,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = settings.deviceAddress,
+                        text = buildAnnotatedString {
+                            if (isConnected) {
+                                withStyle(SpanStyle(color = primary, fontWeight = FontWeight.Medium)) {
+                                    append("Connesso")
+                                }
+                                append(" · ")
+                            }
+                            append(settings.deviceAddress)
+                        },
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                // Chip connesso
-                if (isConnected) {
-                    SuggestionChip(
-                        onClick = {},
-                        label = { Text("Connesso", style = MaterialTheme.typography.labelSmall) },
-                        colors = SuggestionChipDefaults.suggestionChipColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 Spacer(Modifier.width(4.dp))

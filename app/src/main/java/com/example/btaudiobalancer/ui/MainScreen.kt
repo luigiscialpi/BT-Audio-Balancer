@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,7 +57,7 @@ fun MainScreen(
                 },
                 actions = {
                     IconButton(onClick = onRefresh) {
-                        Icon(Icons.Default.Bluetooth, contentDescription = "Aggiorna")
+                        Icon(Icons.Default.Refresh, contentDescription = "Aggiorna")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -237,6 +238,21 @@ fun DeviceCard(
     // cambiano (es. DataStore caricato dopo il primo disegno della card).
     var balance by remember(settings.balance) { mutableFloatStateOf(settings.balance) }
     var boostMb by remember(settings.boostMb) { mutableIntStateOf(settings.boostMb) }
+    var confirmDelete by remember { mutableStateOf(false) }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Eliminare il profilo?") },
+            text = { Text("Bilanciamento e amplificazione salvati per ${settings.deviceName} andranno persi.") },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Elimina") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("Annulla") }
+            }
+        )
+    }
 
     Card(
         modifier = Modifier
@@ -288,13 +304,12 @@ fun DeviceCard(
                     )
                 }
                 Spacer(Modifier.width(4.dp))
-                // Switch abilitazione
+                // Switch abilitazione (dimensione naturale: il target di tocco resta >= 48 dp)
                 Switch(
                     checked = settings.enabled,
-                    onCheckedChange = { onSettingsChange(settings.copy(enabled = it)) },
-                    modifier = Modifier.size(40.dp, 24.dp)
+                    onCheckedChange = { onSettingsChange(settings.copy(enabled = it)) }
                 )
-                IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { confirmDelete = true }) {
                     Icon(Icons.Default.Delete, contentDescription = "Elimina",
                         tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                         modifier = Modifier.size(18.dp))

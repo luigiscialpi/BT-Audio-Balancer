@@ -121,7 +121,16 @@ class AudioEffectService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Il sistema vuole startForeground subito dopo startForegroundService, qualunque sia
         // l'azione (anche al restart senza intent); il testo con il nome del device lo mette handle().
-        startForeground(NOTIF_ID, buildNotification("Effetti audio attivi"))
+        try {
+            startForeground(NOTIF_ID, buildNotification("Effetti audio attivi"))
+        } catch (e: SecurityException) {
+            // Android 14+: il tipo connectedDevice richiede BLUETOOTH_CONNECT (es. revocato mentre
+            // il service era attivo). Senza foreground il service non serve a nulla: ci si ferma.
+            // shortcut: da startForegroundService il sistema darebbe comunque l'errore dei 5 secondi.
+            Log.w(TAG, "startForeground refused: ${e.message}")
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         if (intent == null) restoreConnected(startId) else commands.trySend(intent to startId)
         return START_STICKY
     }
@@ -178,8 +187,9 @@ class AudioEffectService : Service() {
                 if (connected.disconnect(mac)) applyActive()
             }
             ACTION_UPDATE -> {
-                // Service appena avviato dalla UI, che considera connesso questo device: ci si fida
-                if (connected.isEmpty) connected.connect(mac, name)
+                // La UI considera connesso questo device: se il service non lo conosceva (appena
+                // avviato, o profilo appena creato) ci si fida, senza scavalcare l'attivo
+                connected.join(mac, name)
                 // Un device secondario si salva (lo fa il ViewModel) ma non si applica
                 if (connected.activeMac == mac) {
                     applier.apply(DeviceAudioSettings(

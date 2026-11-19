@@ -71,7 +71,7 @@ app/src/test/java/com/example/btaudiobalancer/   ← JUnit 4: DeviceSettingsRepo
 Scelte di progetto:
 
 - **Un solo applier**: il `MainViewModel` non ne crea uno proprio, per evitare sovrascritture concorrenti. Le modifiche in tempo reale passano al `AudioEffectService` con `ACTION_UPDATE`.
-- **Profili isolati**: il service tiene l'elenco (`connected`) dei device audio connessi che hanno un profilo. Un update dalla UI per un device che non è l'attivo viene solo salvato. Alla disconnessione dell'attivo si riapplica il profilo del precedente; se non ne resta nessuno si azzera e il service si ferma.
+- **Profili isolati**: il service tiene l'elenco (`connected`) dei device audio connessi che hanno un profilo. Un update dalla UI per un device che non è l'attivo viene solo salvato; se il service non lo conosceva, entra nell'elenco senza scavalcare l'attivo. Alla disconnessione dell'attivo si riapplica il profilo del precedente; se non ne resta nessuno si azzera e il service si ferma.
 - **Comandi in coda**: APPLY, UPDATE e RESET passano da una coda e girano uno alla volta, perché l'applier non è thread-safe.
 - **Salvataggio su azione dell'utente**: gli slider salvano e applicano solo al rilascio (`onValueChangeFinished`), mai alla comparsa della card. Un profilo di un device non connesso viene salvato ma non applicato.
 - **Filtro audio**: `BluetoothReceiver` e la lista "connessi" della UI escludono i device non audio (`isAudio()`).

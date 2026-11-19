@@ -50,6 +50,31 @@ class ConnectedDevicesTest {
     }
 
     @Test
+    fun joiningEmptyListBecomesActive() {
+        devices.join("A", "Cuffie")
+        assertEquals("A", devices.activeMac)
+    }
+
+    @Test
+    fun joiningDoesNotStealActiveButIsNextInLine() {
+        devices.connect("A", "Cuffie")
+        devices.join("B", "Auto")
+        assertEquals("A", devices.activeMac)
+        assertTrue(devices.disconnect("A"))
+        assertEquals("B", devices.activeMac)
+    }
+
+    @Test
+    fun joiningKnownDeviceChangesNothing() {
+        devices.connect("A", "Cuffie")
+        devices.connect("B", "Auto")
+        devices.join("B", "Auto")
+        assertEquals("B", devices.activeMac)
+        assertTrue(devices.disconnect("B"))
+        assertEquals("A", devices.activeMac)
+    }
+
+    @Test
     fun emptyAfterLastDisconnect() {
         devices.connect("A", "Cuffie")
         assertTrue(devices.disconnect("A"))

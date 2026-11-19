@@ -17,6 +17,19 @@ class ConnectedDevices {
         devices[mac] = name
     }
 
+    /**
+     * Aggiunge un device di cui non si conosce l'ordine di connessione (es. profilo appena creato
+     * dalla UI). Se non c'era va in testa: non scavalca l'attivo, ma torna utile quando questo si
+     * disconnette. Se c'era gia' non cambia nulla.
+     */
+    fun join(mac: String, name: String) {
+        if (mac in devices) return
+        val rest = LinkedHashMap(devices)
+        devices.clear()
+        devices[mac] = name
+        devices.putAll(rest)
+    }
+
     /** @return true se era l'attivo, quindi gli effetti vanno riassegnati. */
     fun disconnect(mac: String): Boolean {
         val wasActive = activeMac == mac

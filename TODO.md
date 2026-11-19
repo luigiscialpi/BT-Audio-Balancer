@@ -17,7 +17,7 @@ Si spunta `[x]` nella stessa patch che chiude l'attività. Ogni voce ha un ID da
 - [ ] **M3** Senza `BLUETOOTH_CONNECT` (Android 14+) `startForeground` può lanciare `SecurityException` dal percorso UI.
 - [x] **M4** Eliminare il profilo di un device connesso manda al service lo stesso `ACTION_RESET` della disconnessione: se era l'attivo si riapplica il profilo del precedente o si azzera. Per i device non connessi non parte nessun comando. `MainViewModel` ora ha un solo punto (`sendToService`) per parlare col service.
 - [ ] **M5** Lista "connessi": `isConnected` via reflection su API nascosta (se fallisce risultano connessi tutti i device accoppiati) e aggiornamento solo in `onResume` o a mano. (I device non audio sono già esclusi.)
-- [ ] **M6** `BootReceiver` non fa nulla e non serve: dopo un riavvio nessun device è connesso e `ACL_CONNECTED` copre la riconnessione. Eliminarlo insieme a `RECEIVE_BOOT_COMPLETED`.
+- [x] **M6** Eliminati `BootReceiver` (non faceva nulla), la sua voce nel manifest e `RECEIVE_BOOT_COMPLETED`: dopo un riavvio nessun device è connesso e `ACL_CONNECTED` copre la riconnessione.
 - [ ] **M7** Un device connesso che ottiene un profilo mentre un altro è già attivo (profilo creato dalla UI, anche dopo averlo eliminato) non entra nell'elenco del service: il profilo si salva ma non si applica, e se l'altro device si disconnette il suo non viene ripristinato. `ACTION_UPDATE` aggiunge un device all'elenco solo se questo è vuoto.
 
 ## UX/UI

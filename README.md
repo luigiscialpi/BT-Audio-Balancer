@@ -56,8 +56,7 @@ app/src/main/java/com/example/btaudiobalancer/
 │   ├── DeviceAudioSettings.kt        ← data class: mac, name, balance(-1..1), boostMb(0..1500), enabled
 │   └── DeviceSettingsRepository.kt   ← DataStore (iniettabile nel costruttore): chiavi prefissate per MAC, allDevices Flow
 ├── receiver/
-│   ├── BluetoothReceiver.kt          ← ACL_CONNECTED/DISCONNECTED → passa MAC e avvia AudioEffectService
-│   └── BootReceiver.kt               ← vuoto, da eliminare (M6)
+│   └── BluetoothReceiver.kt          ← ACL_CONNECTED/DISCONNECTED → passa MAC e avvia AudioEffectService
 ├── service/
 │   ├── AudioEffectService.kt         ← ForegroundService: coda di comandi APPLY/UPDATE/RESET, applica il profilo dell'ultimo device connesso
 │   └── ConnectedDevices.kt           ← elenco dei device connessi in ordine (vale l'ultimo)

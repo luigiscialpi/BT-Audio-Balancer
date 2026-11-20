@@ -44,6 +44,7 @@ Il centro (balance 0) e il reset toccano `master_balance` solo se l'app l'aveva 
 - Né l'elenco dei connessi nell'app né il ripristino dopo la morte del processo coprono LE Audio: contano solo i dispositivi A2DP. Un dispositivo solo LE Audio riceve il profilo alla connessione (`BluetoothReceiver`) ma nell'app non compare tra i connessi, quindi da lì il profilo non si può creare.
 - Dopo la morte del processo non si conosce l'ordine di connessione originale: vale quello restituito dal sistema.
 - Verifica reale sul Redmi Note 9 Pro con Android 12/MIUI V140: il percorso `master_balance` non è stato scritto dal processo e il bilanciamento è ricaduto su `DynamicsProcessing`; a `+6 dB` `LoudnessEnhancer` ha raggiunto `600mB`, ma il volume è rimasto percepito invariato e l'audio è stato giudicato distorto.
+- Verifica reale D09/D13/D15 sul Redmi: alla disconnessione A2DP la UI si svuota correttamente ma service/notifica possono restare attivi; `kill -9` non ha riavviato il service entro 15 secondi; alla riaccensione globale del Bluetooth il profilo salvato non è stato riapplicato automaticamente.
 
 ## Architettura
 

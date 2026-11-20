@@ -92,6 +92,8 @@ Servono JDK 17 e l'Android SDK. Su macOS `./setup.sh` cerca l'SDK e scrive `loca
 
 I test coprono il salvataggio per dispositivo (`DeviceSettingsRepositoryTest`), la regola "vince l'ultimo connesso" (`ConnectedDevicesTest`) e la cadenza dell'anteprima degli slider (`LatestThrottleTest`).
 
+Le prove su un telefono vero (Bluetooth, audio di sistema, interfaccia) non sono automatizzabili: la checklist è in [`TEST-SU-DISPOSITIVO.md`](TEST-SU-DISPOSITIVO.md).
+
 ## Attività aperte
 
 Bug noti e lavori da fare: [`TODO.md`](TODO.md).

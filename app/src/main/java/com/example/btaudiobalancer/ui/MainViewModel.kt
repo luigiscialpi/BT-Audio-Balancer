@@ -42,6 +42,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState
 
+    /** Anteprima durante il trascinamento di uno slider: al massimo 10 aggiornamenti al secondo. */
+    private val previewThrottle = LatestThrottle<DeviceAudioSettings>(viewModelScope, 100) { applyLive(it) }
+
     val savedDevices: StateFlow<List<DeviceAudioSettings>> = repository.allDevices
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -90,8 +93,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             repository.save(settings)
         }
-        // Un profilo di un device non connesso si salva e basta: applicarlo muoverebbe
-        // gli effetti di sistema per un device che non sta riproducendo nulla.
+        applyLive(settings)
+    }
+
+    /** Mentre si trascina uno slider: applica senza salvare. Il salvataggio e' al rilascio (updateAndApply). */
+    fun preview(settings: DeviceAudioSettings) = previewThrottle.submit(settings)
+
+    private fun applyLive(settings: DeviceAudioSettings) {
+        // Un device non connesso non si applica: muoverebbe gli effetti di sistema
+        // per un device che non sta riproducendo nulla.
         if (_uiState.value.connectedDevices.none { it.deviceAddress == settings.deviceAddress }) return
 
         // Delega l'applicazione al Service (che ha l'unica istanza di AudioEffectApplier)

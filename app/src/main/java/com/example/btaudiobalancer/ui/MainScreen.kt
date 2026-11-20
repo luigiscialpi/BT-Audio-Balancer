@@ -39,6 +39,7 @@ fun MainScreen(
     uiState: UiState,
     savedDevices: List<DeviceAudioSettings>,
     onSettingsChange: (DeviceAudioSettings) -> Unit,
+    onPreview: (DeviceAudioSettings) -> Unit,
     onDelete: (String) -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -108,6 +109,7 @@ fun MainScreen(
                         settings = saved ?: device,
                         isConnected = true,
                         onSettingsChange = onSettingsChange,
+                        onPreview = onPreview,
                         onDelete = { onDelete(device.deviceAddress) }
                     )
                 }
@@ -135,6 +137,7 @@ fun MainScreen(
                         settings = device,
                         isConnected = false,
                         onSettingsChange = onSettingsChange,
+                        onPreview = onPreview,
                         onDelete = { onDelete(device.deviceAddress) }
                     )
                 }
@@ -236,6 +239,7 @@ fun DeviceCard(
     settings: DeviceAudioSettings,
     isConnected: Boolean,
     onSettingsChange: (DeviceAudioSettings) -> Unit,
+    onPreview: (DeviceAudioSettings) -> Unit,
     onDelete: () -> Unit
 ) {
     // Valori mostrati durante il trascinamento. Si riallineano a quelli salvati quando
@@ -340,10 +344,11 @@ fun DeviceCard(
             Spacer(Modifier.height(16.dp))
 
             // -- Bilanciamento L/R ----------------------------------------------------
-            // Il salvataggio legge lo stato al momento del rilascio, non un valore catturato prima.
+            // Durante il trascinamento si applica in anteprima senza salvare; il salvataggio legge lo
+            // stato al momento del rilascio, non un valore catturato prima.
             BalanceControl(
                 balance = balance,
-                onBalanceChange = { balance = it },
+                onBalanceChange = { balance = it; onPreview(settings.copy(balance = it)) },
                 onBalanceChangeFinished = { onSettingsChange(settings.copy(balance = balance)) }
             )
 
@@ -352,7 +357,7 @@ fun DeviceCard(
             // -- Amplificazione -------------------------------------------------------
             BoostControl(
                 boostMb = boostMb,
-                onBoostChange = { boostMb = it },
+                onBoostChange = { boostMb = it; onPreview(settings.copy(boostMb = it)) },
                 onBoostChangeFinished = { onSettingsChange(settings.copy(boostMb = boostMb)) }
             )
         }

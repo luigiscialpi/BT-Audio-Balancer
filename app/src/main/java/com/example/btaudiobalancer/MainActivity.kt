@@ -46,6 +46,7 @@ class MainActivity : ComponentActivity() {
                     uiState        = uiState,
                     savedDevices   = savedDevices,
                     onSettingsChange = { viewModel.updateAndApply(it) },
+                    onPreview      = { viewModel.preview(it) },
                     onDelete       = { viewModel.deleteDevice(it) },
                     onRefresh      = { viewModel.refreshConnectedDevices() }
                 )

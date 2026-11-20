@@ -44,6 +44,9 @@ class AudioEffectService : Service() {
 
     private val connected = ConnectedDevices()
 
+    /** Testo della notifica in primo piano; null finche' il service non lo e'. */
+    private var notificationText: String? = null
+
     companion object {
         const val ACTION_APPLY  = "com.example.btaudiobalancer.APPLY"
         const val ACTION_RESET  = "com.example.btaudiobalancer.RESET"
@@ -121,8 +124,9 @@ class AudioEffectService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Il sistema vuole startForeground subito dopo startForegroundService, qualunque sia
         // l'azione (anche al restart senza intent); il testo con il nome del device lo mette handle().
+        // A service gia' in primo piano non lo richiede, e la notifica non si riposta se non cambia.
         try {
-            startForeground(NOTIF_ID, buildNotification("Effetti audio attivi"))
+            showNotification(notificationText ?: "Effetti audio attivi")
         } catch (e: SecurityException) {
             // Android 14+: il tipo connectedDevice richiede BLUETOOTH_CONNECT (es. revocato mentre
             // il service era attivo). Senza foreground il service non serve a nulla: ci si ferma.
@@ -189,7 +193,7 @@ class AudioEffectService : Service() {
             applier.reset()
             stopSelf(startId) // ignorato se nel frattempo e' arrivato un comando piu' recente
         } else {
-            startForeground(NOTIF_ID, buildNotification("Connesso: ${connected.activeName}"))
+            showNotification("Connesso: ${connected.activeName}")
         }
     }
 
@@ -214,6 +218,13 @@ class AudioEffectService : Service() {
             NotificationManager.IMPORTANCE_LOW
         ).apply { description = "Effetti audio Bluetooth attivi" }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    }
+
+    /** Ripubblica la notifica solo se il testo cambia: l'anteprima degli slider manda fino a 10 comandi al secondo. */
+    private fun showNotification(text: String) {
+        if (text == notificationText) return
+        startForeground(NOTIF_ID, buildNotification(text))
+        notificationText = text
     }
 
     private fun buildNotification(text: String): Notification {

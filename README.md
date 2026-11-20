@@ -5,7 +5,7 @@ App Android che ricorda bilanciamento L/R e amplificazione per ogni dispositivo 
 ## Come funziona
 
 - Per ogni dispositivo (riconosciuto dal MAC address) si salvano: bilanciamento L/R (da -1 a +1), amplificazione (da 0 a +15 dB, a passi di 1 dB) e un interruttore per disabilitare il profilo.
-- Il profilo si crea dall'app: con il dispositivo connesso, muovi uno slider (si salva al rilascio) o l'interruttore. Dalla sezione "Profili salvati" si modifica o si elimina.
+- Il profilo si crea dall'app: con il dispositivo connesso, muovi uno slider (l'effetto si sente mentre trascini, si salva al rilascio) o l'interruttore. Dalla sezione "Profili salvati" si modifica o si elimina.
 - Quando un dispositivo audio con un profilo si connette, un servizio in primo piano applica gli effetti; quando si disconnette li azzera. I dispositivi senza profilo e quelli non audio (orologi, mouse...) vengono ignorati.
 - Gli effetti valgono per tutto l'audio del telefono, non per un solo dispositivo. Con più dispositivi connessi vale il profilo dell'ultimo connesso; se si disconnette, o se ne elimini il profilo, torna quello del precedente.
 - Dopo che il sistema uccide il processo, il servizio riparte e riapplica i profili dei dispositivi A2DP ancora connessi.
@@ -63,19 +63,20 @@ app/src/main/java/com/example/btaudiobalancer/
 │   ├── AudioEffectService.kt         ← ForegroundService: coda di comandi APPLY/UPDATE/RESET, applica il profilo dell'ultimo device connesso
 │   └── ConnectedDevices.kt           ← elenco dei device connessi in ordine (vale l'ultimo)
 └── ui/
+    ├── LatestThrottle.kt             ← passa solo l'ultimo valore, al massimo uno ogni intervallo (anteprima degli slider)
     ├── MainViewModel.kt              ← elenco dei connessi da A2DP, aggiornato dai broadcast di sistema; delega al Service
     ├── MainScreen.kt                 ← LazyColumn: sezione connessi + sezione profili salvati, visualizer L/R
     └── theme/                        ← Color, Type, Theme (dynamic color Android 12+)
 
-app/src/test/java/com/example/btaudiobalancer/   ← JUnit 4: DeviceSettingsRepositoryTest, ConnectedDevicesTest
+app/src/test/java/com/example/btaudiobalancer/   ← JUnit 4: DeviceSettingsRepositoryTest, ConnectedDevicesTest, LatestThrottleTest
 ```
 
 Scelte di progetto:
 
 - **Un solo applier**: il `MainViewModel` non ne crea uno proprio, per evitare sovrascritture concorrenti. Le modifiche in tempo reale passano al `AudioEffectService` con `ACTION_UPDATE`.
 - **Profili isolati**: il service tiene l'elenco (`connected`) dei device audio connessi che hanno un profilo. Un update dalla UI per un device che non è l'attivo viene solo salvato; se il service non lo conosceva, entra nell'elenco senza scavalcare l'attivo. Alla disconnessione dell'attivo si riapplica il profilo del precedente; se non ne resta nessuno si azzera e il service si ferma.
-- **Comandi in coda**: APPLY, UPDATE e RESET passano da una coda e girano uno alla volta, perché l'applier non è thread-safe.
-- **Salvataggio su azione dell'utente**: gli slider salvano e applicano solo al rilascio (`onValueChangeFinished`), mai alla comparsa della card. Un profilo di un device non connesso viene salvato ma non applicato.
+- **Comandi in coda**: APPLY, UPDATE e RESET passano da una coda e girano uno alla volta, perché l'applier non è thread-safe. La notifica in primo piano si ripubblica solo se il testo cambia, così l'anteprima degli slider non la ripubblica a ogni comando.
+- **Salvataggio su azione dell'utente**: gli slider salvano al rilascio (`onValueChangeFinished`), mai alla comparsa della card. Durante il trascinamento applicano solo in anteprima, senza salvare (`MainViewModel.preview` tramite `LatestThrottle`: l'ultimo valore, al massimo 10 al secondo). Un profilo di un device non connesso viene salvato ma non applicato.
 - **Filtro audio**: `BluetoothReceiver` esclude i device non audio (`isAudio()`); la lista "connessi" della UI viene dal profilo A2DP, che per definizione è audio.
 - **Device connessi**: li chiede `queryConnectedA2dp()` (`getProfileProxy` + `getConnectedDevices`), usata sia dalla UI sia dal ripristino. Dopo un restart senza intent il service li accoda come nuove connessioni; la UI si aggiorna con un receiver registrato dal `MainViewModel` (broadcast protetti: `A2DP CONNECTION_STATE_CHANGED`, `ADAPTER STATE_CHANGED`).
 
@@ -89,7 +90,7 @@ Servono JDK 17 e l'Android SDK. Su macOS `./setup.sh` cerca l'SDK e scrive `loca
 ./gradlew testDebugUnitTest    # test unitari JVM, senza dispositivo
 ```
 
-I test coprono il salvataggio per dispositivo (`DeviceSettingsRepositoryTest`) e la regola "vince l'ultimo connesso" (`ConnectedDevicesTest`).
+I test coprono il salvataggio per dispositivo (`DeviceSettingsRepositoryTest`), la regola "vince l'ultimo connesso" (`ConnectedDevicesTest`) e la cadenza dell'anteprima degli slider (`LatestThrottleTest`).
 
 ## Attività aperte
 

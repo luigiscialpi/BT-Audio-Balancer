@@ -22,6 +22,31 @@ Legenda: **[AI]** lo esegue la chat con `adb`; **[TU]** lo fai tu sul telefono; 
 
 4. **[AI]** Definizione dei profili usati nei test. **Profilo A**: bilanciamento -0.5 (verso sinistra) e amplificazione +3 dB. **Profilo B**: bilanciamento +0.5 e amplificazione +6 dB.
 
+## Stato della sessione del 20 novembre 2026
+
+Prima sospensione dei test:
+
+- Dispositivo: Redmi Note 9 Pro, modello `Redmi_Note_9_Pro`
+- Android: 12, API 31
+- MIUI/HyperOS: `V140`
+- Debug wireless: `adb-d511899c-0LpFp7._adb-tls-connect._tcp`
+- Dispositivo Bluetooth: Redmi Buds 6 Active, `90:EF:4A:AB:8B:69`
+- Test JVM: `./gradlew testDebugUnitTest` riuscito
+
+| Test | Esito | Evidenza/annotazione |
+|---|---|---|
+| D01 | OK | Avvio pulito dopo `pm clear`; permesso Bluetooth concesso dall'utente |
+| D02 | OK | `WRITE_SECURE_SETTINGS: granted=true`; avviso iniziale sparito |
+| D03 | OK | Card connessa, profilo assente e nessun cambio del valore iniziale |
+| D04 | OK | Profilo A applicato a circa `-0.478`, `300mB`; il telefono usa `APPLIED_VIA_DYNAMICS_PROCESSING` |
+| D05 | OK | Trascinamento con 28 righe `Applied:`, nessun match `enqueue rate`; conferma auditiva dell'utente |
+| D06 | KO | A `600mB`/`300mB`/`0mB` il volume resta invariato e l'audio viene percepito distorto; a 0 restano 0 effetti `LoudnessEnhancer` in `audio_flinger` |
+| D07 | OK | `master_balance=0.4` resta dopo Centro e riconnessione delle cuffie |
+| D08 | OK | OFF logga `disabled, resetting` e `Reset to neutral`; ON riapplica il profilo |
+| D09-D25 | DA RIPRENDERE | Sessione sospesa prima della disconnessione D09 |
+
+Per riprendere, partire da D09 mantenendo il Profilo A salvato. Sul Redmi questo test richiede un'attenzione particolare: il percorso `Settings.System.putFloat("master_balance")` non viene scritto e il bilanciamento usa il fallback `DynamicsProcessing`; l'effetto LoudnessEnhancer non ha prodotto un aumento percettibile del volume.
+
 ### Comandi utili
 
 | Cosa | Comando |

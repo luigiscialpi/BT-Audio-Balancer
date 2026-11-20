@@ -8,7 +8,7 @@ Legenda: **[AI]** lo esegue la chat con `adb`; **[TU]** lo fai tu sul telefono; 
 
 ## Preparazione
 
-1. **[TU]** Telefono con debug USB attivo (o debug wireless). Su MIUI/HyperOS attiva anche "Debug USB (impostazioni di sicurezza)": senza, `pm grant` e `input` non funzionano. Per i test di morte del processo (D13) togli all'app le restrizioni di batteria e abilita l'avvio automatico, altrimenti il sistema può impedirne il riavvio.
+1. **[TU]** Telefono con debug USB attivo (o debug wireless). Su MIUI/HyperOS attiva anche "Debug USB (impostazioni di sicurezza)": senza, `pm grant` e `input` non funzionano. L'ottimizzazione della batteria conta per D10 (che la imposta da sé) e per D13: lì tienila esclusa e abilita l'avvio automatico, altrimenti il sistema può impedire il riavvio del processo.
 2. **[TU]** Cuffie o altoparlante Bluetooth A2DP già accoppiato, con musica pronta da riprodurre. Per il gruppo D serve un secondo dispositivo audio Bluetooth. Per D25 (facoltativo) uno con LE Audio, su Android 13 o successivo.
 3. **[AI]** Dal PC, dalla cartella del progetto:
 
@@ -36,6 +36,7 @@ Legenda: **[AI]** lo esegue la chat con `adb`; **[TU]** lo fai tu sul telefono; 
 | Permessi | `adb shell dumpsys package $PKG \| grep -E "WRITE_SECURE_SETTINGS\|BLUETOOTH_CONNECT"` (guarda `granted=`) |
 | Dare / togliere un permesso | `adb shell pm grant $PKG android.permission.WRITE_SECURE_SETTINGS` (idem `BLUETOOTH_CONNECT`); `pm revoke` per toglierlo |
 | Profili salvati (DataStore) | `adb exec-out run-as $PKG cat files/datastore/device_settings.preferences_pb \| strings` (chiavi `<mac>_name`, `_balance`, `_boost`, `_enabled`) |
+| Esclusione dalla batteria | `adb shell cmd deviceidle whitelist +$PKG` (esclude) / `-$PKG` (rimette l'ottimizzazione); controllo: `adb shell dumpsys deviceidle whitelist \| grep $PKG` (se il comando non va, da Impostazioni) |
 | Cancellare i dati dell'app | `adb shell pm clear $PKG` |
 | Aprire l'app | `adb shell am start -n $PKG/.MainActivity` |
 | Screenshot | `adb exec-out screencap -p > shot.png` |
@@ -78,8 +79,9 @@ Atteso: da spento `master_balance` torna neutro, nel log "disabled, resetting" o
 **D09 Disconnessione (B2).** [TU] Spegni le cuffie.
 Atteso: la card sparisce da "Dispositivi connessi" entro pochi secondi; `master_balance` torna neutro; il service si ferma (`dumpsys activity services` non lo mostra) e la notifica sparisce.
 
-**D10 Riconnessione senza aprire l'app (B1, M6).** [AI] Manda l'app in secondo piano con `input keyevent KEYCODE_HOME`: niente `force-stop`, perché un'app fermata così non riceve i broadcast del manifest finché non la riapri a mano. [TU] Riaccendi le cuffie.
-Atteso: compare la notifica "Connesso: <nome>", il log mostra `Applied:` e `master_balance` è quello del profilo. [TU] Si sente.
+**D10 Riconnessione senza aprire l'app (B1, M6, B6).** [AI] Manda l'app in secondo piano con `input keyevent KEYCODE_HOME`: niente `force-stop`, perché un'app fermata così non riceve i broadcast del manifest finché non la riapri a mano. Su Android 12 o successivo fai il test due volte: prima **con** l'esclusione dalla batteria (`cmd deviceidle whitelist +$PKG`), poi **senza** (`-$PKG`). [TU] Spegni e riaccendi le cuffie.
+Atteso con l'esclusione (e su Android 11 o precedente, sempre): compare la notifica "Connesso: <nome>", il log mostra `Applied:` e `master_balance` è quello del profilo. [TU] Si sente.
+Atteso su Android 12+ senza esclusione (limite noto B6): nessun crash (`logcat -b crash -d` vuoto per il pacchetto), nel log "service non avviabile dal background", profilo non applicato e, allo spegnimento delle cuffie, effetti non azzerati. Se invece si applica comunque, annotalo: sul tuo telefono il limite non c'è.
 
 **D11 Aprire l'app non cambia nulla (B1).** [AI] Con le cuffie connesse e il profilo A salvato, apri e chiudi l'app 3 volte, anche dopo `force-stop`.
 Atteso: DataStore identico a prima e nessuna riga `Applied:` causata dall'apertura.

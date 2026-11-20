@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.example.btaudiobalancer.bluetooth.displayName
 import com.example.btaudiobalancer.bluetooth.isAudio
@@ -29,15 +30,24 @@ class BluetoothReceiver : BroadcastReceiver() {
 
         when (intent.action) {
             BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                val serviceIntent = AudioEffectService.intentApply(context, mac, name)
-                ContextCompat.startForegroundService(context, serviceIntent)
+                startService(context, AudioEffectService.intentApply(context, mac, name))
             }
             BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
                 // Passa il MAC del device disconnesso al Service cosi'
                 // puo' resettare solo se corrisponde al device attivo
-                val serviceIntent = AudioEffectService.intentReset(context, mac, name)
-                ContextCompat.startForegroundService(context, serviceIntent)
+                startService(context, AudioEffectService.intentReset(context, mac, name))
             }
+        }
+    }
+
+    private fun startService(context: Context, intent: Intent) {
+        try {
+            ContextCompat.startForegroundService(context, intent)
+        } catch (e: IllegalStateException) {
+            // Android 12+: un broadcast Bluetooth non e' tra le eccezioni al divieto di avviare un service
+            // in primo piano dal background (ForegroundServiceStartNotAllowedException): passa solo se
+            // l'app e' visibile o esclusa dall'ottimizzazione della batteria. Meglio non crollare.
+            Log.w("BluetoothReceiver", "service non avviabile dal background: ${e.message}")
         }
     }
 }

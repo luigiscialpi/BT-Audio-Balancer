@@ -127,9 +127,11 @@ class AudioEffectService : Service() {
         // A service gia' in primo piano non lo richiede, e la notifica non si riposta se non cambia.
         try {
             showNotification(notificationText ?: "Effetti audio attivi")
-        } catch (e: SecurityException) {
-            // Android 14+: il tipo connectedDevice richiede BLUETOOTH_CONNECT (es. revocato mentre
-            // il service era attivo). Senza foreground il service non serve a nulla: ci si ferma.
+        } catch (e: RuntimeException) {
+            if (e !is SecurityException && e !is IllegalStateException) throw e
+            // SecurityException (Android 14+: il tipo connectedDevice richiede BLUETOOTH_CONNECT, es.
+            // revocato mentre il service era attivo) o IllegalStateException (Android 12+: avvio in
+            // primo piano non consentito dal background). Senza foreground il service non serve: ci si ferma.
             // shortcut: da startForegroundService il sistema darebbe comunque l'errore dei 5 secondi.
             Log.w(TAG, "startForeground refused: ${e.message}")
             stopSelf(startId)

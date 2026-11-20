@@ -15,6 +15,7 @@ App Android che ricorda bilanciamento L/R e amplificazione per ogni dispositivo 
 
 - Android 8.0 o successivo (`minSdk 26`).
 - Permesso Bluetooth: `BLUETOOTH_CONNECT` su Android 12+, chiesto all'avvio.
+- Android 12+: per applicare un profilo quando l'app è chiusa, escludi l'app dall'ottimizzazione della batteria (Impostazioni → App → BT Audio Balancer → Batteria → Nessuna restrizione; su MIUI/HyperOS anche l'avvio automatico). Il sistema non permette di avviare un service in primo piano dal background in risposta a un broadcast Bluetooth, tranne con quell'esclusione ([documentazione Android](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start)).
 - Per il bilanciamento di sistema serve concedere una volta, dal PC con l'app installata:
 
   ```bash
@@ -37,6 +38,7 @@ Il centro (balance 0) e il reset toccano `master_balance` solo se l'app l'aveva 
 
 ## Limiti noti
 
+- Su Android 12+, con l'app chiusa e senza l'esclusione dalla batteria, l'avvio del service dal receiver può essere rifiutato: l'app non crolla, ma il profilo non si applica alla connessione e un `master_balance` già impostato resta com'è alla disconnessione.
 - L'amplificazione (`LoudnessEnhancer`) e il ripiego DynamicsProcessing agiscono sulla sessione audio globale 0, deprecata dalla documentazione Android: su alcune versioni o telefoni possono non sentirsi.
 - `master_balance` vale per tutte le uscite audio, non solo per il Bluetooth. Se il processo viene ucciso mentre un profilo è applicato, il valore resta finché un nuovo profilo non lo sovrascrive.
 - Né l'elenco dei connessi nell'app né il ripristino dopo la morte del processo coprono LE Audio: contano solo i dispositivi A2DP. Un dispositivo solo LE Audio riceve il profilo alla connessione (`BluetoothReceiver`) ma nell'app non compare tra i connessi, quindi da lì il profilo non si può creare.

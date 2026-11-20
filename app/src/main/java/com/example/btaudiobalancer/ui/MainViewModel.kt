@@ -122,6 +122,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         // Se e' connesso potrebbe essere quello attivo: con lo stesso comando della disconnessione
         // il service lo toglie dall'elenco e riapplica il profilo del precedente, o azzera.
         val device = _uiState.value.connectedDevices.find { it.deviceAddress == mac } ?: return
+        // La card resta, ma senza profilo mostra i valori di default e non quelli appena eliminati
+        _uiState.update { state ->
+            state.copy(connectedDevices = state.connectedDevices.map {
+                if (it.deviceAddress == mac) DeviceAudioSettings(deviceAddress = mac, deviceName = it.deviceName) else it
+            })
+        }
         sendToService(AudioEffectService.intentReset(getApplication<Application>(), mac, device.deviceName))
     }
 

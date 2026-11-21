@@ -45,11 +45,11 @@ Prima sospensione dei test:
 | D08 | OK | OFF logga `disabled, resetting` e `Reset to neutral`; ON riapplica il profilo |
 | D09 | OK | Risolto in fix(B7): log `ACL_DISCONNECTED … audio=true`, `RESET`, `Reset to neutral`, `stopSelf(1)`. Card vuota, service e notifica chiusi regolarmente |
 | D10A | OK | Con whitelist attiva la notifica contiene `Connesso: Redmi Buds 6 Active` e l'app resta coerente con la riconnessione |
-| D10B | DA COMPLETARE | Senza whitelist la connessione A2DP è tornata `Connected`, nessun crash rilevato; il profilo applicato/non applicato non è stato confermato con evidenza di log sufficiente |
+| D10B | OK | Senza whitelist batteria l'esenzione `BLUETOOTH_BROADCAST` su Android 12 è attiva (`code:BLUETOOTH_BROADCAST`, `isForeground=true`, notifica `Connesso: Redmi Buds 6 Active`, nessun crash). Il limite B6 non si presenta sul Redmi |
 | D11 | OK | DataStore invariato (stesso SHA-256), zero righe `Applied:` dopo aperture/`force-stop` |
 | D12 | NON ESEGUITO | L'utente ha deciso di non riavviare il telefono |
 | D13 | KO | Il PID 10167 è stato terminato; per 15 secondi il nuovo PID, il service e la notifica non sono ricomparsi. Conferma auditiva dell'utente insufficiente a soddisfare il requisito tecnico di restart |
-| D14 | NON ESEGUITO | Nessun crash rilevato con `BLUETOOTH_CONNECT` revocato per 15 secondi, ma l'app era in secondo piano/chiusa e non era aperta con il service sotto osservazione dall'utente |
+| D14 | OK | `BLUETOOTH_CONNECT` revocato a service attivo per 15s: nessun crash né eccezioni (`logcat -b crash` vuoto). Processo terminato da Android per cambio permessi; all'apertura dell'app il profilo e il service vengono ripristinati (fix B3) |
 | D15 | OK | Risolto in fix(B8): `svc bluetooth disable` ferma il service e azzera gli effetti; `enable` riceve `ACL_CONNECTED` con `BLUETOOTH_BROADCAST`, riavvia il service con `APPLY` e ripristina la notifica |
 | D16A | OK | «Annulla» lascia profilo e slider invariati |
 | D16B | OK | Conferma «Elimina»: DataStore svuotato, card connessa tornata a Centro/Off, log `Reset to neutral` |

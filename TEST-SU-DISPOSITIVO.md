@@ -64,7 +64,7 @@ Alla ripresa andare direttamente a D18, o ripetere D10B/D14 con osservazione esp
 |---|---|
 | Bilanciamento di sistema (`null` = mai impostato) | `adb shell settings get system master_balance` |
 | Impostarlo / rimuoverlo a mano | `adb shell settings put system master_balance 0.4` / `adb shell settings delete system master_balance` |
-| Log dell'app | `adb logcat -c` poi `adb logcat -v time -s AudioEffectApplier:V AudioEffectService:V MainViewModel:V AndroidRuntime:E` |
+| Log dell'app | `adb logcat -c` poi `adb logcat -v time -s AudioEffectApplier:V AudioEffectService:V BluetoothReceiver:V MainViewModel:V AndroidRuntime:E` |
 | Crash | `adb logcat -b crash -d` |
 | Service in primo piano? | `adb shell dumpsys activity services $PKG` (cerca `isForeground=true`; se non c'è nulla, il service non gira) |
 | Notifica | `adb shell dumpsys notification --noredact \| grep -A12 "pkg=$PKG"` |
@@ -113,11 +113,11 @@ Atteso: `master_balance` resta 0.4: l'app non sovrascrive un valore che non ha i
 Atteso: da spento `master_balance` torna neutro, nel log "disabled, resetting" o "Reset to neutral", il suono torna normale e la card dice "Profilo disabilitato -- non verra applicato alla connessione"; da acceso il profilo si riapplica.
 
 **D09 Disconnessione (B2).** [TU] Spegni le cuffie.
-Atteso: la card sparisce da "Dispositivi connessi" entro pochi secondi; `master_balance` torna neutro; il service si ferma (`dumpsys activity services` non lo mostra) e la notifica sparisce.
+Atteso: la card sparisce da "Dispositivi connessi" entro pochi secondi; `master_balance` torna neutro; il service si ferma (`dumpsys activity services` non lo mostra) e la notifica sparisce. Nel log, in ordine: `ACL_DISCONNECTED … audio=true`, `RESET … startId=N`, `Reset to neutral`, `stopSelf(N)`. Se manca la prima riga il receiver non ha ricevuto l'evento; se compare `audio=false` lo ha scartato il filtro.
 
 **D10 Riconnessione senza aprire l'app (B1, M6, B6).** [AI] Manda l'app in secondo piano con `input keyevent KEYCODE_HOME`: niente `force-stop`, perché un'app fermata così non riceve i broadcast del manifest finché non la riapri a mano. Su Android 12 o successivo fai il test due volte: prima **con** l'esclusione dalla batteria (`cmd deviceidle whitelist +$PKG`), poi **senza** (`-$PKG`). [TU] Spegni e riaccendi le cuffie.
 Atteso con l'esclusione (e su Android 11 o precedente, sempre): compare la notifica "Connesso: <nome>", il log mostra `Applied:` e `master_balance` è quello del profilo. [TU] Si sente.
-Atteso su Android 12+ senza esclusione (limite noto B6): nessun crash (`logcat -b crash -d` vuoto per il pacchetto), nel log "service non avviabile dal background", profilo non applicato e, allo spegnimento delle cuffie, effetti non azzerati. Se invece si applica comunque, annotalo: sul tuo telefono il limite non c'è.
+Atteso su Android 12+ senza esclusione: nessun crash (`logcat -b crash -d` vuoto per il pacchetto) e, nel log del receiver, `ACL_CONNECTED … audio=true`. Se il profilo si applica (`Applied:`), l'esenzione Bluetooth di Android 12 funziona e B6 non è un problema su questo telefono. Se invece compare "service non avviabile dal background", il limite B6 è reale: il profilo non si applica e, allo spegnimento delle cuffie, gli effetti non si azzerano. Annota quale dei due casi succede.
 
 **D11 Aprire l'app non cambia nulla (B1).** [AI] Con le cuffie connesse e il profilo A salvato, apri e chiudi l'app 3 volte, anche dopo `force-stop`.
 Atteso: DataStore identico a prima e nessuna riga `Applied:` causata dall'apertura.
@@ -128,13 +128,13 @@ Atteso: il profilo A è ancora salvato; non gira nessun service finché non si c
 ## Gruppo B: robustezza
 
 **D13 Morte del processo (B3).** [TU] Cuffie connesse, profilo A applicato. [AI] Uccidi il processo con `kill -9`, poi controlla ogni secondo per 15 secondi.
-Atteso: nuovo PID, service di nuovo in primo piano, notifica presente, nel log `Applied:` e `master_balance` coerente con il profilo. KO se restano tutti gli effetti azzerati o il service non riparte (prima controlla le restrizioni batteria del punto 1).
+Atteso: nuovo PID, service di nuovo in primo piano, notifica presente, nel log `Applied:` e `master_balance` coerente con il profilo. Su MIUI abilita l'avvio automatico, aspetta 60 secondi (non 15) e allega `adb logcat -b all -d | grep -iE "am_proc_start|am_kill|btaudiobalancer|autostart"`; se compare `startForeground refused` il processo è ripartito ma Android 12 non lo lascia andare in primo piano (vedi B3). KO se restano tutti gli effetti azzerati o il service non riparte (prima controlla le restrizioni batteria del punto 1).
 
 **D14 Permesso Bluetooth revocato mentre il service gira (M3).** [TU] Cuffie connesse. [AI] `pm revoke … BLUETOOTH_CONNECT`, aspetta 15 secondi, controlla `logcat -b crash -d`, poi `pm grant`.
 Atteso: nessun crash e nessun dialogo "l'app si è fermata"; eventualmente nel log "startForeground refused". Annota la versione di Android: il caso interessante è la 14 o successiva. Se compare `ForegroundServiceDidNotStartInTimeException` è il rischio noto di M3: riportalo con il log.
 
 **D15 Bluetooth spento e acceso (M5).** [AI] Con l'app aperta e le cuffie connesse: `svc bluetooth disable`, poi `enable`.
-Atteso: a Bluetooth spento la lista dei connessi si svuota, `master_balance` torna neutro e il service si ferma; a Bluetooth riacceso e cuffie riconnesse la card ricompare da sola.
+Atteso: a Bluetooth spento la lista dei connessi si svuota, `master_balance` torna neutro e il service si ferma; a Bluetooth riacceso e cuffie riconnesse la card ricompare da sola e il profilo si riapplica (log: `ACL_CONNECTED … audio=true`, `APPLY`, `Applied:`; se manca `Applied:` guarda `audio=` nella riga del receiver).
 
 **D16 Eliminare il profilo (M4, U1).** [AI] Con le cuffie connesse e il profilo A attivo, tocca il cestino. Prima "Annulla", poi di nuovo il cestino e "Elimina".
 Atteso: "Annulla" non cambia nulla; "Elimina" fa sparire il profilo da "Profili salvati", azzera gli effetti (`master_balance` neutro), ferma il service se non ci sono altri dispositivi; la card connessa resta, con gli slider ai valori di default (bilanciamento al centro, amplificazione a 0) e il nome invariato.

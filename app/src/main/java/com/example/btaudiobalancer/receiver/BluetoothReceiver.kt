@@ -11,6 +11,8 @@ import com.example.btaudiobalancer.bluetooth.displayName
 import com.example.btaudiobalancer.bluetooth.isAudio
 import com.example.btaudiobalancer.service.AudioEffectService
 
+private const val TAG = "BluetoothReceiver"
+
 class BluetoothReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -22,11 +24,12 @@ class BluetoothReceiver : BroadcastReceiver() {
         }
 
         device ?: return
-        // Orologi, mouse ecc. non devono toccare gli effetti
-        if (!device.isAudio()) return
-
         val mac  = device.address ?: return
         val name = device.displayName()
+        // Orologi, mouse ecc. non devono toccare gli effetti
+        val audio = device.isAudio()
+        Log.i(TAG, "${intent.action} $name ($mac) audio=$audio")
+        if (!audio) return
 
         when (intent.action) {
             BluetoothDevice.ACTION_ACL_CONNECTED -> {
@@ -44,10 +47,9 @@ class BluetoothReceiver : BroadcastReceiver() {
         try {
             ContextCompat.startForegroundService(context, intent)
         } catch (e: IllegalStateException) {
-            // Android 12+: un broadcast Bluetooth non e' tra le eccezioni al divieto di avviare un service
-            // in primo piano dal background (ForegroundServiceStartNotAllowedException): passa solo se
-            // l'app e' visibile o esclusa dall'ottimizzazione della batteria. Meglio non crollare.
-            Log.w("BluetoothReceiver", "service non avviabile dal background: ${e.message}")
+            // Android 12+ (ForegroundServiceStartNotAllowedException): lo stack Bluetooth di AOSP 12 da' ai
+            // broadcast ACL un'esenzione temporanea, ma un produttore puo' toglierla. Meglio non crollare.
+            Log.w(TAG, "service non avviabile dal background: ${e.message}")
         }
     }
 }

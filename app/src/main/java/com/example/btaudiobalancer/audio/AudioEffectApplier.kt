@@ -216,7 +216,7 @@ class AudioEffectApplier(private val context: Context) {
         return try {
             Settings.System.putFloat(context.contentResolver, "master_balance", balance)
         } catch (e: Exception) { // SecurityException senza permessi
-            Log.d(TAG, "trySettingsSystem: master_balance not written: ${e.message}")
+            Log.d(TAG, "trySettingsSystem: master_balance not written: $e")
             false
         }
     }

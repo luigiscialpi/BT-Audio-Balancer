@@ -161,6 +161,7 @@ class AudioEffectService : Service() {
     private suspend fun handle(intent: Intent, startId: Int) {
         val mac  = intent.getStringExtra(EXTRA_MAC) ?: return
         val name = intent.getStringExtra(EXTRA_NAME) ?: mac
+        Log.i(TAG, "${intent.action} $name startId=$startId")
         when (intent.action) {
             ACTION_APPLY -> {
                 val settings = repository.getOnce(mac)
@@ -193,6 +194,7 @@ class AudioEffectService : Service() {
         }
         if (connected.isEmpty) {
             applier.reset()
+            Log.i(TAG, "nessun device connesso: stopSelf($startId)")
             stopSelf(startId) // ignorato se nel frattempo e' arrivato un comando piu' recente
         } else {
             showNotification("Connesso: ${connected.activeName}")

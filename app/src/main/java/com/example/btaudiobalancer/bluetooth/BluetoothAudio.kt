@@ -8,12 +8,18 @@ import android.content.Context
 
 /**
  * False solo se il sistema dice che NON e' un device audio (orologio, mouse, telefono...).
- * Classe sconosciuta (null, o BLUETOOTH_CONNECT negato) conta come audio.
+ * Classe sconosciuta conta come audio: il sistema non la riporta come null ma come MISC (0) o
+ * UNCATEGORIZED finche' non l'ha letta, per esempio subito dopo l'accensione del Bluetooth o se
+ * BLUETOOTH_CONNECT e' negato; scartare questi casi faceva perdere l'evento di connessione.
  * shortcut: i device solo-LE non hanno classe e passano il filtro; se disturbano gli effetti, escludere DEVICE_TYPE_LE.
  */
-fun BluetoothDevice.isAudio(): Boolean {
-    val major = try { bluetoothClass?.majorDeviceClass } catch (_: SecurityException) { null }
-    return major == null || major == BluetoothClass.Device.Major.AUDIO_VIDEO
+fun BluetoothDevice.isAudio(): Boolean =
+    isAudioClass(try { bluetoothClass?.majorDeviceClass } catch (_: SecurityException) { null })
+
+internal fun isAudioClass(major: Int?): Boolean = when (major) {
+    null, BluetoothClass.Device.Major.MISC, BluetoothClass.Device.Major.UNCATEGORIZED,
+    BluetoothClass.Device.Major.AUDIO_VIDEO -> true
+    else -> false
 }
 
 /** Nome da mostrare; se non si puo' leggere (BLUETOOTH_CONNECT negato) vale il MAC. */

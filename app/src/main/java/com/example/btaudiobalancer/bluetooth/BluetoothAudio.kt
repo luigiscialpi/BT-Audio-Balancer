@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.os.Build
 
 /**
  * False solo se il sistema dice che NON e' un device audio (orologio, mouse, telefono...).
@@ -22,8 +23,16 @@ internal fun isAudioClass(major: Int?): Boolean = when (major) {
     else -> false
 }
 
-/** Nome da mostrare; se non si puo' leggere (BLUETOOTH_CONNECT negato) vale il MAC. */
-fun BluetoothDevice.displayName(): String = try { name ?: address } catch (_: SecurityException) { address }
+/** Nome da mostrare; preferisce l'alias utente (API 30+) al nome di fabbrica, altrimenti MAC. */
+fun BluetoothDevice.displayName(): String = try {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        alias ?: name ?: address
+    } else {
+        name ?: address
+    }
+} catch (_: SecurityException) {
+    address
+}
 
 /**
  * Chiede al sistema i device A2DP connessi adesso e li passa a [onResult]: sul thread principale,

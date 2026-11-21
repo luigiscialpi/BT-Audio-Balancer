@@ -73,9 +73,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshConnectedDevices() {
         getApplication<Application>().queryConnectedA2dp { devices ->
             val connected = devices.orEmpty().map { dev ->
-                // Impostazioni salvate se esistono, altrimenti una scheda vuota
-                savedDevices.value.find { it.deviceAddress == dev.address }
-                    ?: DeviceAudioSettings(deviceAddress = dev.address, deviceName = dev.displayName())
+                val name = dev.displayName()
+                val saved = savedDevices.value.find { it.deviceAddress == dev.address }
+                if (saved != null) {
+                    if (saved.deviceName != name) {
+                        saved.copy(deviceName = name).also { updated ->
+                            viewModelScope.launch { repository.save(updated) }
+                        }
+                    } else {
+                        saved
+                    }
+                } else {
+                    DeviceAudioSettings(deviceAddress = dev.address, deviceName = name)
+                }
             }
             _uiState.update { it.copy(connectedDevices = connected) }
         }

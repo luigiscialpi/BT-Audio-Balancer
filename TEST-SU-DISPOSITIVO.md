@@ -43,18 +43,20 @@ Prima sospensione dei test:
 | D06 | KO | A `600mB`/`300mB`/`0mB` il volume resta invariato e l'audio viene percepito distorto; a 0 restano 0 effetti `LoudnessEnhancer` in `audio_flinger` |
 | D07 | OK | `master_balance=0.4` resta dopo Centro e riconnessione delle cuffie |
 | D08 | OK | OFF logga `disabled, resetting` e `Reset to neutral`; ON riapplica il profilo |
-| D09 | KO | Android ha registrato A2DP `Disconnected`, la card è diventata correttamente vuota, ma service e notifica sono rimasti attivi invece di sparire |
+| D09 | OK | Risolto in fix(B7): log `ACL_DISCONNECTED … audio=true`, `RESET`, `Reset to neutral`, `stopSelf(1)`. Card vuota, service e notifica chiusi regolarmente |
 | D10A | OK | Con whitelist attiva la notifica contiene `Connesso: Redmi Buds 6 Active` e l'app resta coerente con la riconnessione |
 | D10B | DA COMPLETARE | Senza whitelist la connessione A2DP è tornata `Connected`, nessun crash rilevato; il profilo applicato/non applicato non è stato confermato con evidenza di log sufficiente |
 | D11 | OK | DataStore invariato (stesso SHA-256), zero righe `Applied:` dopo aperture/`force-stop` |
 | D12 | NON ESEGUITO | L'utente ha deciso di non riavviare il telefono |
 | D13 | KO | Il PID 10167 è stato terminato; per 15 secondi il nuovo PID, il service e la notifica non sono ricomparsi. Conferma auditiva dell'utente insufficiente a soddisfare il requisito tecnico di restart |
 | D14 | NON ESEGUITO | Nessun crash rilevato con `BLUETOOTH_CONNECT` revocato per 15 secondi, ma l'app era in secondo piano/chiusa e non era aperta con il service sotto osservazione dall'utente |
-| D15 | KO | Bluetooth disattivato: `0` e `Reset to neutral`; Bluetooth riattivato: A2DP `Connected`/`mIsPlaying=true`, ma l'audio è rimasto centrale invece del profilo salvato |
+| D15 | OK | Risolto in fix(B8): `svc bluetooth disable` ferma il service e azzera gli effetti; `enable` riceve `ACL_CONNECTED` con `BLUETOOTH_BROADCAST`, riavvia il service con `APPLY` e ripristina la notifica |
 | D16A | OK | «Annulla» lascia profilo e slider invariati |
 | D16B | OK | Conferma «Elimina»: DataStore svuotato, card connessa tornata a Centro/Off, log `Reset to neutral` |
 | D17 | OK | 10 cicli completati: nessun crash, zero `LoudnessEnhancer` in `audio_flinger`, memoria nella normalità |
-| D18-D25 | DA RIPRENDERE | Sessione sospesa dopo D17 |
+| D18 | OK | Schermi 320, 360, 411 dp e font_scale 1.3/1.5: target switch/cestino >= 48 dp (104x96 px e 96x96 px a 320 dpi), nessun testo tagliato |
+| D19 | OK | Lista vuota con testo atteso; nessun testo tecnico; avviso del permesso compare solo quando revocato e sparisce al grant |
+| D20-D25 | DA COMPLETARE | D20 TalkBack; D21-D24 2 dispositivi; D25 LE Audio |
 
 Alla ripresa andare direttamente a D18, o ripetere D10B/D14 con osservazione esplicita se si vuole completare la copertura. Sul Redmi resta necessario verificare il percorso `Settings.System.putFloat("master_balance")`: oggi il bilanciamento usa il fallback `DynamicsProcessing` e LoudnessEnhancer non ha prodotto un aumento percettibile del volume.
 

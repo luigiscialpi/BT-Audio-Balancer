@@ -57,6 +57,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             savedDevices.collect { saved ->
                 _uiState.update { it.copy(savedDevices = saved) }
+                if (!AudioEffectService.isRunning) {
+                    refreshConnectedDevices()
+                }
             }
         }
         // Solo broadcast protetti di sistema: non serve il flag di export (anche su Android 14+)
@@ -88,6 +91,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             _uiState.update { it.copy(connectedDevices = connected) }
+
+            // Se il service non e' in esecuzione (es. processo terminato da Android o riavvio),
+            // ripristina il profilo per i device connessi che hanno un profilo salvato e abilitato.
+            if (!AudioEffectService.isRunning) {
+                for (dev in connected) {
+                    val saved = savedDevices.value.find { it.deviceAddress == dev.deviceAddress }
+                    if (saved != null && saved.enabled) {
+                        sendToService(AudioEffectService.intentApply(
+                            context = getApplication(),
+                            mac = dev.deviceAddress,
+                            name = dev.deviceName
+                        ))
+                    }
+                }
+            }
         }
     }
 
@@ -143,12 +161,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun sendToService(intent: Intent) {
         try {
-            // Poiché l'utente sta interagendo con l'interfaccia (UI attiva), possiamo usare startService.
-            // Se il Service è già attivo in Foreground (perché le cuffie sono connesse), l'intent
-            // viene consegnato normalmente a onStartCommand.
-            getApplication<Application>().startService(intent)
+            val app = getApplication<Application>()
+            ContextCompat.startForegroundService(app, intent)
         } catch (e: Exception) {
-            android.util.Log.w("MainViewModel", "startService failed: ${e.message}")
+            android.util.Log.w("MainViewModel", "startForegroundService failed: ${e.message}")
         }
     }
 

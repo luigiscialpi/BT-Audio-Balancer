@@ -48,6 +48,10 @@ class AudioEffectService : Service() {
     private var notificationText: String? = null
 
     companion object {
+        @Volatile
+        var isRunning: Boolean = false
+            private set
+
         const val ACTION_APPLY  = "com.example.btaudiobalancer.APPLY"
         const val ACTION_RESET  = "com.example.btaudiobalancer.RESET"
         /** Azione dalla UI per applicare un cambio di impostazioni in tempo reale */
@@ -106,6 +110,7 @@ class AudioEffectService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         applier    = AudioEffectApplier(this)
         repository = DeviceSettingsRepository(this)
         createNotificationChannel()
@@ -208,6 +213,7 @@ class AudioEffectService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         applier.release()
         scope.cancel()
         super.onDestroy()
